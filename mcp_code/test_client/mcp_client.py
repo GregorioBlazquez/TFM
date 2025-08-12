@@ -29,12 +29,12 @@ client_mcp = Client(MCP_BASE)
 
 def ask_llm_for_tool(user_question: str) -> dict:
     system_prompt = (
-        "Eres un orquestador MCP. Cuando el usuario pregunte, debes elegir la herramienta "
-        "entre las disponibles: ['tourism_tool'] y devolver únicamente un JSON con la forma:\n"
+        "You are an MCP orchestrator. When the user asks, you must choose the tool "
+        "from the available ones: ['tourism_tool'] and return ONLY a JSON in the form:\n"
         '{"tool": "tourism_tool", "args": {"comunidad": "<string>", "periodo": "<string>"}}\n'
-        "Donde 'comunidad' es el nombre de la región (ejemplo 'Cataluña') y 'periodo' el año y mes en formato 'AAAAMM' (ejemplo '202508').\n"
-        "Los valores dentro de args deben ser strings. Responde SOLO con ese JSON, sin explicaciones.\n"
-        "Si no sabes qué responder, devuelve un JSON vacío '{}'."
+        "Where 'comunidad' is the name of the region (example 'Cataluña') and 'periodo' is the year and month in 'AAAAMM' format (example '202508').\n"
+        "The values inside args must be strings. Respond ONLY with that JSON, no explanations.\n"
+        "If you don't know what to answer, return an empty JSON '{}'."
     )
 
 
@@ -68,36 +68,36 @@ def ask_llm_for_tool(user_question: str) -> dict:
 
 
 async def main_async():
-    print("Cliente MCP interactivo. Escribe tu consulta (ej: '¿Cuántos turistas se esperan en Cataluña en agosto de 2025?')")
-    user_q = input("Pregunta> ").strip()
+    print("Interactive MCP client. Type your query (e.g.: 'How many tourists are expected in Cataluña in August 2025?')")
+    user_q = input("Question> ").strip()
     if not user_q:
-        print("No has escrito nada. Saliendo.")
+        print("You didn't type anything. Exiting.")
         return
 
     try:
         decision = ask_llm_for_tool(user_q)
-        print("Decisión LLM:", decision)
+        print("LLM decision:", decision)
     except Exception as e:
-        print("Error al pedir decisión al LLM:", e)
+        print("Error requesting decision from LLM:", e)
         return
 
     tool = decision.get("tool")
     args = decision.get("args", {})
 
     if not tool:
-        print("LLM no devolvió 'tool'. Salir.")
+        print("LLM did not return 'tool'. Exiting.")
         return
 
-    print(f"Llamando al MCP tool '{tool}' con args: {args}")
+    print(f"Calling MCP tool '{tool}' with args: {args}")
 
-    # Usar contexto async para abrir cliente MCP
+    # Use async context to open MCP client
     async with client_mcp:
         try:
             result = await client_mcp.call_tool(tool, args)
-            print("Resultado MCP:")
+            print("MCP result:")
             print(result)
         except Exception as e:
-            print("Error invocando el MCP tool:", e)
+            print("Error invoking MCP tool:", e)
 
 
 def main():
