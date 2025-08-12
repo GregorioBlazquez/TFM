@@ -15,5 +15,9 @@ fastmcp==2.11.1
 python-dotenv==1.0.1
 requests==2.32.3
 openai==1.98.0
-langchain==0.3.27
+langchain==0.3.74
+langchain-core==0.3.74
+langchain-openai==0.3.29
 langchain_community==0.3.27
+langgraph==0.6.4
+asyncio==4.0.0

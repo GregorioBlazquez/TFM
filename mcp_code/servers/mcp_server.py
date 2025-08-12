@@ -31,12 +31,8 @@ def tourism_tool(comunidad: str, periodo: str) -> dict:
     """
     print(f"Predicting tourism for {comunidad} in {periodo}")
     print("HARD CODED PREDICTION FOR TESTING PURPOSES")
-    return {
-        "comunidad": comunidad,
-        "periodo": periodo,
-        "prediccion_turistas": 3_000_000
-    }
-    #return predict_tourism(comunidad, periodo)
+    
+    return predict_tourism(comunidad, periodo)
 
 # Run the HTTP server (streamable transport)
 if __name__ == "__main__":

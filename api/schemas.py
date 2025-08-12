@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 class PredictionInput(BaseModel):
-    # comunidad: str  # Ej: "Andalucía"
+    comunidad: str  # Ej: "Andalucía"
     periodo: str    # Ej: "2025M08"
 
 class PredictionOutput(BaseModel):
