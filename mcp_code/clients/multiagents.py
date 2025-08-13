@@ -9,26 +9,37 @@ load_dotenv()
 
 MCP_BASE = os.getenv("MCP_BASE", "http://127.0.0.1:8080/mcp/")
 
+# --- LLM for routing ---
+llm_router = AzureChatOpenAI(
+    azure_deployment=os.getenv("AZURE_OPENAI_ROUTER_DEPLOYMENT"),
+    openai_api_version=os.getenv("AZURE_OPENAI_ROUTER_API_VERSION"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ROUTER_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_ROUTER_API_KEY")
+)
+
+# --- LLM for main agents ---
+llm_agents = AzureChatOpenAI(
+    azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+)
+
+
 async def build_agents(session):
     tools = await load_mcp_tools(session)
 
-    # Filtrar por prefijo
+    # Filter by prefix
     tourism_tools = [t for t in tools if t.name.startswith("tourism_")]
     rag_tools = [t for t in tools if t.name.startswith("rag_")]
 
-    llm = AzureChatOpenAI(
-        azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-        openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY")
-    )
-
-    predictor_agent = create_react_agent(llm, tourism_tools)
-    rag_agent = create_react_agent(llm, rag_tools)
+    predictor_agent = create_react_agent(llm_agents, tourism_tools)
+    rag_agent = create_react_agent(llm_agents, rag_tools)
 
     return predictor_agent, rag_agent
 
-# Funciones de los nodos
+
+# --- Nodes ---
 async def run_predictor(state, predictor):
     query = state["query"]
     result = await predictor.ainvoke({"messages": query})
@@ -39,15 +50,38 @@ async def run_rag(state, rag):
     result = await rag.ainvoke({"messages": query})
     return {"result": str(result)}
 
+
+# --- Supervisor ---
 async def supervisor(state):
     query = state["query"].lower()
-    if "turistas" in query:
-        return "predictor"
-    elif "documento" in query or "informe" in query:
-        return "rag"
-    else:
-        return END
 
+    # Step 1: quick rules (save tokens in clear cases)
+    """
+    if any(k in query for k in ["turistas", "viajeros", "visitantes", "predicción"]):
+        return "predictor"
+    if any(k in query for k in ["documento", "informe", "pdf", "reporte"]):
+        return "rag"
+    """
+
+    # Step 2: LLM for intent classification
+    system_prompt = """You are an intent classifier.
+    Classify the user's query into one of these categories:
+    - predictor: if the question requires prediction of the number of tourists or another numerical model.
+    - rag: if the question is about documents, reports, or textual information.
+    - other: if it does not fit the above.
+    
+    Respond ONLY with one word: predictor, rag or other."""
+    msg = [{"role": "system", "content": system_prompt},
+           {"role": "user", "content": state["query"]}]
+
+    classification = (await llm_router.ainvoke(msg)).content.strip().lower()
+
+    if classification not in ["predictor", "rag"]:
+        return END
+    return classification
+
+
+# --- Main loop ---
 async def main():
     client = MultiServerMCPClient({
         "main": {"url": MCP_BASE, "transport": "streamable_http"}
@@ -79,11 +113,11 @@ async def main():
         app = workflow.compile()
 
         while True:
-            user_input = input("Pregunta: ")
+            user_input = input("Question: ")
             if user_input.lower() in ["salir", "exit"]:
                 break
             result_state = await app.ainvoke({"query": user_input})
-            print("Respuesta:", result_state["result"])
+            print("Answer:", result_state["result"])
 
 
 if __name__ == "__main__":
