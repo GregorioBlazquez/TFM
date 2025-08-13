@@ -24,6 +24,7 @@ async def main():
     async with client.session("tourism") as session:
         # Load available MCP tools for this session
         tools = await load_mcp_tools(session)
+        tourism_tools = [t for t in tools if t.name.startswith("tourism_")]
 
         # Build the ReAct agent using the loaded tools
         # Load the base ReAct prompt from LangChain Hub
@@ -38,7 +39,7 @@ async def main():
         )
 
         # Create the agent with the LLM and MCP tools
-        agent = create_react_agent(llm, tools)
+        agent = create_react_agent(llm, tourism_tools)
 
         # Call the agent with a sample question
         response = await agent.ainvoke({
