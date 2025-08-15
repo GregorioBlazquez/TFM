@@ -30,10 +30,10 @@ async def build_agents(session):
     tools = await load_mcp_tools(session)
 
     # Filter by prefix
-    tourism_tools = [t for t in tools if t.name.startswith("tourism_")]
+    api_tools = [t for t in tools if t.name.startswith("api_")]
     rag_tools = [t for t in tools if t.name.startswith("rag_")]
 
-    predictor_agent = create_react_agent(llm_agents, tourism_tools)
+    predictor_agent = create_react_agent(llm_agents, api_tools)
     rag_agent = create_react_agent(llm_agents, rag_tools)
 
     return predictor_agent, rag_agent

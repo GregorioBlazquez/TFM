@@ -3,10 +3,10 @@ from fastmcp import FastMCP
 
 report_mcp = FastMCP(name="mcp-report-agent")
 
-@report_mcp.tool()
-def generate_report(data: dict) -> str:
+@report_mcp.tool(tags={"report"})
+def generate(data: dict) -> str:
     """
-    Genera un informe básico a partir de datos.
+    Generates a basic report from data.
     """
     print("Generating report...")
-    return f"Informe generado con datos: {data}"
+    return f"Report generated with data: {data}"

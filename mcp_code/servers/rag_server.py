@@ -2,16 +2,16 @@ from fastmcp import FastMCP
 
 rag_mcp = FastMCP(name="mcp-rag")
 
-@rag_mcp.tool()
-def rag_search(query: str) -> dict:
+@rag_mcp.tool(tags={"rag"})
+def search(query: str) -> dict:
     """
-    Simula búsqueda RAG devolviendo resultados ficticios.
+    Simulates RAG search returning mock results.
     """
     print(f"RAG search for: {query}")
     return {
         "query": query,
         "results": [
-            {"title": "Doc1", "snippet": "Contenido de prueba 1"},
-            {"title": "Doc2", "snippet": "Contenido de prueba 2"}
+            {"title": "Doc1", "snippet": "Test content 1"},
+            {"title": "Doc2", "snippet": "Test content 2"}
         ]
     }
