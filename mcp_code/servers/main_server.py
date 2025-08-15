@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from mcp_code.servers.rag_server import rag_mcp
 from mcp_code.servers.report_server import report_mcp
-from api.main import app as fastapi_app # Assuming you have a FastAPI app defined in api.main
+from api.main import app as fastapi_app
 
 load_dotenv()
 

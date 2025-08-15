@@ -3,7 +3,7 @@ import joblib
 from datetime import datetime
 from api.schemas import VALID_REGIONS
 
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models")
+MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models/arima")
 
 def parse_period(period_str: str) -> datetime:
     try:
