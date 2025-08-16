@@ -4,11 +4,22 @@ from langchain_openai import AzureChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
 import asyncio, os
 from dotenv import load_dotenv
+import logging
 
+########## ENV VARS ##########
+# Load environment variables
 load_dotenv()
-
 MCP_BASE = os.getenv("MCP_BASE", "http://127.0.0.1:8080/mcp/")
 
+########## LOGGING ##########
+# Initialize logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s"
+)
+logger = logging.getLogger("multiagent-client")
+
+########## LANGGRAPH AGENTS ##########
 # --- LLM for routing ---
 llm_router = AzureChatOpenAI(
     azure_deployment=os.getenv("AZURE_OPENAI_ROUTER_DEPLOYMENT"),
@@ -25,7 +36,7 @@ llm_agents = AzureChatOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY")
 )
 
-
+# --- Build agents ---
 async def build_agents(session):
     tools = await load_mcp_tools(session)
 
@@ -42,18 +53,57 @@ async def build_agents(session):
 # --- Nodes ---
 async def run_predictor(state, predictor):
     query = state["query"]
-    result = await predictor.ainvoke({"messages": query})
-    return {"result": str(result)}
+    logger.info(f"[Predictor] Input query: {query}")
+
+    # Build messages from history
+    messages = []
+    for i, text in enumerate(state.get("history", [])):
+        role = "user" if i % 2 == 0 else "assistant"
+        messages.append({"role": role, "content": text})
+
+    # Add the current query as the last user message
+    messages.append({"role": "user", "content": query})
+
+    result = await predictor.ainvoke({"messages": messages})
+    answer = extract_answer(result)
+    logger.info(f"[Predictor] Raw result: {result}")
+
+    # Save the answer in history
+    state.setdefault("history", []).append(answer)
+
+    return {"result": answer}
 
 async def run_rag(state, rag):
     query = state["query"]
-    result = await rag.ainvoke({"messages": query})
-    return {"result": str(result)}
+    logger.info(f"[RAG] Input query: {query}")
 
+    # Build messages from history
+    messages = []
+    for i, text in enumerate(state.get("history", [])):
+        role = "user" if i % 2 == 0 else "assistant"
+        messages.append({"role": role, "content": text})
+
+    # Add the current query as the last user message
+    messages.append({"role": "user", "content": query})
+
+    result = await rag.ainvoke({"messages": messages})
+    answer = extract_answer(result)
+    logger.info(f"[RAG] Raw result: {result}")
+
+    # Save the answer in history
+    state.setdefault("history", []).append(answer)
+
+    return {"result": answer}
+
+async def handle_other(state):
+    msg = "No agent can handle this query."
+    state.setdefault("history", []).append(msg)
+    return {"result": msg}
 
 # --- Supervisor ---
 async def supervisor(state):
     query = state["query"].lower()
+    logger.info(f"[Supervisor] Routing query: {query}")
 
     # Step 1: quick rules (save tokens in clear cases)
     """
@@ -63,6 +113,12 @@ async def supervisor(state):
         return "rag"
     """
 
+    # Initialize history if it doesn't exist
+    state["history"] = state.get("history", [])
+
+    # Build prompt with history
+    history_text = "\n".join(state["history"])
+
     # Step 2: LLM for intent classification
     system_prompt = """You are an intent classifier.
     Classify the user's query into one of these categories:
@@ -71,14 +127,39 @@ async def supervisor(state):
     - other: if it does not fit the above.
     
     Respond ONLY with one word: predictor, rag or other."""
+
+    msg_content = f"Conversation so far:\n{history_text}\nCurrent query:\n{query}" if history_text else query
     msg = [{"role": "system", "content": system_prompt},
-           {"role": "user", "content": state["query"]}]
+           {"role": "user", "content": msg_content}]
 
     classification = (await llm_router.ainvoke(msg)).content.strip().lower()
+    logger.info(f"[Supervisor] Classification result: {classification}")
+
+    # Save query in history
+    state["history"].append(query)
 
     if classification not in ["predictor", "rag"]:
-        return END
+        return "other"
+
     return classification
+
+########## MAIN CLIENT ##########
+def extract_answer(result) -> str:
+    """
+    Extracts the useful text from the LangGraph agent's response.
+    - Looks in result['messages'] for the last AIMessage with content.
+    - If not found, returns the result itself as a string.
+    """
+    try:
+        msgs = result.get("messages", [])
+        for msg in reversed(msgs):
+            if getattr(msg, "type", None) == "ai" and msg.content:
+                return msg.content
+        # Fallback if there is no AIMessage
+        return str(result)
+    except Exception as e:
+        logger.warning(f"Failed to extract answer: {e}")
+        return str(result)
 
 
 # --- Main loop ---
@@ -100,10 +181,12 @@ async def main():
 
         workflow.add_node("predictor", predictor_node)
         workflow.add_node("rag", rag_node)
+        workflow.add_node("other", handle_other)
 
         workflow.add_conditional_edges(START, supervisor, {
             "predictor": "predictor",
             "rag": "rag",
+            "other": "other",
             END: END
         })
 
@@ -112,11 +195,13 @@ async def main():
 
         app = workflow.compile()
 
+        state = {"history": []}
         while True:
             user_input = input("Question: ")
             if user_input.lower() in ["salir", "exit"]:
                 break
-            result_state = await app.ainvoke({"query": user_input})
+            result_state = await app.ainvoke({**state, "query": user_input})
+            state.update(result_state)
             print("Answer:", result_state["result"])
 
 
