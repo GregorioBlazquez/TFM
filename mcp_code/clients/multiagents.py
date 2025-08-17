@@ -45,7 +45,11 @@ async def build_agents(session):
     rag_tools = [t for t in tools if t.name.startswith("rag_")]
 
     predictor_agent = create_react_agent(llm_agents, api_tools)
-    rag_agent = create_react_agent(llm_agents, rag_tools)
+    rag_agent = create_react_agent(
+        llm_agents,
+        rag_tools,
+        prompt="You are a RAG assistant. Always use the available tools (rag_rag_search, rag_rag_upsert) to answer questions. Do not answer directly, call the tools first."
+    )
 
     return predictor_agent, rag_agent
 

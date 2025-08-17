@@ -54,7 +54,7 @@ if __name__ == "__main__":
         log_level="DEBUG"
     )
 
-########## HEALT CHECK ##########
+########## HEALTH CHECK ##########
 @main_mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> PlainTextResponse:
     return PlainTextResponse("OK")
