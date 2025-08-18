@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
-from api.schemas import PredictionInput, PredictionOutput
-from api.model_handler import predict_tourists
+from api.schemas import PredictionInput, PredictionOutput, HistoricalInput, HistoricalOutput
+from api.model_handler import predict_tourists, get_historical_tourists
 from api.schemas import REGION_DESCRIPTION
 
 app = FastAPI(title="Tourist Prediction API")
@@ -27,5 +27,30 @@ def predict(input_data: PredictionInput):
             upper_ci=upper_ci,
             model=model_name
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post(
+    "/historical",
+    response_model=HistoricalOutput,
+    summary="Retrieve historical tourist data",
+    description=(
+        "Returns historical tourist numbers for a given region and period.\n\n"
+        "**Region options:** Name of the autonomous community, 'Total' for Spain, or omit to get all regions.\n\n"
+        "**Period format:** YYYY-MM (e.g., '2020-09'). If omitted, all available periods are returned.\n\n"
+        "You can combine region and period, or provide only one of them:\n"
+        "- region only → all periods for that region\n"
+        "- period only → all regions for that period\n"
+        "- both → specific period and region\n"
+        "- neither → full dataset"
+    )
+)
+def historical(input_data: HistoricalInput):
+    """
+    Retrieves historical tourist data for the specified region and/or period.
+    """
+    try:
+        data = get_historical_tourists(input_data.region, input_data.period)
+        return HistoricalOutput(data=data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

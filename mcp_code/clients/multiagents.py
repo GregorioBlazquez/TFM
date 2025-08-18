@@ -183,15 +183,24 @@ async def supervisor(state):
     messages_text += f"User: {query}\n"
 
     system_prompt = """
-        You are an intent classifier.
-        Classify the user's query into one of these categories:
-        - predictor: if the question requires prediction of the number of tourists or another numerical model.
-        - rag: if the question is about documents, data, this project information, EGATUR, FRONTUR or textual information.
-        - reports: if the question requires explanation, reasoning, interpretation, or summaries.
-        - other: if it does not fit the above.
+    You are an intent classifier.
+    Classify the user's query into one of these categories:
 
-        Respond ONLY with one word: predictor, rag, reports or other.
-        """
+    - predictor: if the question requires:
+        • prediction of the number of tourists for future periods using a numerical model, or
+        • retrieval of historical tourist numbers for specific regions or Spain in specific periods.
+    - rag: if the question is about documents, reports, project information, EGATUR, FRONTUR, textual data, or general explanations not related to predictions or historical tourist numbers.
+    - reports: if the question requires explanation, reasoning, interpretation, summaries, or clarifications of results.
+    - other: if it does not fit the above.
+
+    Respond ONLY with one word: predictor, rag, reports or other.
+
+    Examples:
+    - "How many tourists visited Andalucía in 2023-07?" → predictor
+    - "What does the ARIMA forecast mean?" → reports
+    - "Show me the EGATUR report for last year" → rag
+    - "Tell me a joke" → other
+    """
 
     msg = [
         {"role": "system", "content": system_prompt},

@@ -1,7 +1,11 @@
 import os
+from typing import Optional
 import joblib
 from datetime import datetime
 from api.schemas import VALID_REGIONS
+import pandas as pd
+
+DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/processed/num_tourists.csv")
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models/arima")
 
@@ -40,3 +44,32 @@ def predict_tourists(region: str, period: str):
     upper_ci = int(conf_int[-1, 1])
 
     return pred_value, lower_ci, upper_ci, f"ARIMA-{region}"
+
+TOURIST_DATA = pd.read_csv(DATA_PATH, sep=';', parse_dates=['Period'])
+TOURIST_DATA.rename(columns={"CCAA": "region", "Total": "tourists"}, inplace=True)
+
+def get_historical_tourists(region: Optional[str] = None, period: Optional[str] = None):
+    df = TOURIST_DATA.copy()
+
+    if period:
+        try:
+            period_dt = pd.to_datetime(period)
+            df = df[df["Period"] == period_dt]
+        except Exception:
+            raise ValueError(f"Invalid period format: {period}, expected YYYY-MM or YYYY-MM-DD")
+
+    if region:
+        if region != "Total":
+            df = df[df["region"].str.contains(region, case=False)]
+        else:
+            df = df[df["region"] == "Total"]
+
+    if df.empty:
+        raise ValueError(f"No data found for region='{region}' and period='{period}'")
+
+    output = {}
+    for p, group in df.groupby("Period"):
+        output[str(p.date())] = {r: float(v) for r, v in zip(group["region"], group["tourists"])}
+
+    return output
+
