@@ -11,6 +11,7 @@ from api.main import app as fastapi_app
 import logging
 from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
+from fastmcp.prompts.prompt import Message
 
 
 ########## ENV VARS ##########
@@ -36,9 +37,34 @@ main_mcp.add_middleware(DetailedTimingMiddleware())
 # Logging structured JSON of MCP requests (include truncated payloads)
 main_mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
 
+########### PROMPTS ##########
+@main_mcp.prompt
+def supervisor_prompt():
+    return Message("""
+    You are an intent classifier.
+    Classify the user's query into one of these categories:
+
+    - predictor: if the question requires:
+        • prediction of the number of tourists for future periods using a numerical model, or
+        • retrieval of historical tourist numbers for specific regions or Spain in specific periods.
+    - rag: if the question is about documents, reports, project information, EGATUR, FRONTUR, textual data, or general explanations not related to predictions or historical tourist numbers.
+    - reports: if the question requires explanation, reasoning, interpretation, summaries, or clarifications of results.
+    - other: if it does not fit the above.
+
+    Respond ONLY with one word: predictor, rag, reports or other.
+
+    Examples:
+    - "How many tourists visited Andalucía in 2023-07?" → predictor
+    - "What does the ARIMA forecast mean?" → reports
+    - "Show me the EGATUR report for last year" → rag
+    - "Tell me a joke" → other
+    """,
+    role="assistant")
+
 async def setup():
     # Mount existing MCP sub-servers
     main_mcp.mount(rag_mcp, prefix="rag")
+    main_mcp.mount(report_mcp, prefix="report")
 
     # Mount your FastAPI API as an MCP server
     api_mcp = FastMCP.from_fastapi(fastapi_app, name="api-mcp")

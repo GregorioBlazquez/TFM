@@ -48,28 +48,24 @@ llm_reasoning = AzureChatOpenAI(
 async def build_agents(session):
     tools = await load_mcp_tools(session)
 
+    # Get prompts from MCP server
+    logger.info("🔄 Loading prompts from MCP server...")
+    rag_prompt = await session.get_prompt("rag_agent_prompt")
+    report_prompt = await session.get_prompt("report_agent_prompt")
+    supervisor_prompt = await session.get_prompt("supervisor_prompt")
+
+    # Save supervisor_prompt
+    global SUPERVISOR_PROMPT
+    SUPERVISOR_PROMPT = supervisor_prompt.messages[0].content.text if supervisor_prompt.messages else ""
+
     # Filter by prefix
     api_tools = [t for t in tools if t.name.startswith("api_")]
     rag_tools = [t for t in tools if t.name.startswith("rag_")]
 
+    # Create react agents with tools and prompts from MCP servers
     predictor_agent = create_react_agent(llm_agents, api_tools)
-    rag_agent = create_react_agent(
-        llm_agents,
-        rag_tools,
-        prompt="You are a RAG assistant. Always use the available tools (rag_rag_search, rag_rag_upsert) to answer questions. Do not answer directly, call the tools first."
-    )
-
-    reports_agent = create_react_agent(
-        llm_reasoning,
-        [],
-        prompt="""You are a Reasoning assistant.
-            Your role is to:
-            - Interpret outputs from other agents (predictions, RAG results).
-            - Generate clear explanations, clarifications, and analytical narratives.
-            - If the user asks things like "what does it mean?", "summarize", "explain", 
-            or requests an interpretation, this is your responsibility.
-            Do not call external tools. Only reason and explain."""
-        )
+    rag_agent = create_react_agent(llm_agents, rag_tools, prompt=rag_prompt.messages[0].content.text if rag_prompt.messages else "")
+    reports_agent = create_react_agent(llm_reasoning, [], prompt=report_prompt.messages[0].content.text if rag_prompt.messages else "")
 
     return predictor_agent, rag_agent, reports_agent
 
@@ -182,28 +178,8 @@ async def supervisor(state):
     # Append current query without duplicar
     messages_text += f"User: {query}\n"
 
-    system_prompt = """
-    You are an intent classifier.
-    Classify the user's query into one of these categories:
-
-    - predictor: if the question requires:
-        • prediction of the number of tourists for future periods using a numerical model, or
-        • retrieval of historical tourist numbers for specific regions or Spain in specific periods.
-    - rag: if the question is about documents, reports, project information, EGATUR, FRONTUR, textual data, or general explanations not related to predictions or historical tourist numbers.
-    - reports: if the question requires explanation, reasoning, interpretation, summaries, or clarifications of results.
-    - other: if it does not fit the above.
-
-    Respond ONLY with one word: predictor, rag, reports or other.
-
-    Examples:
-    - "How many tourists visited Andalucía in 2023-07?" → predictor
-    - "What does the ARIMA forecast mean?" → reports
-    - "Show me the EGATUR report for last year" → rag
-    - "Tell me a joke" → other
-    """
-
     msg = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": SUPERVISOR_PROMPT},
         {"role": "user", "content": messages_text}
     ]
 

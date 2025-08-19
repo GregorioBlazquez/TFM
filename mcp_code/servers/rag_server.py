@@ -8,6 +8,7 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from fastmcp import FastMCP, Context
+from fastmcp.prompts.prompt import Message
 
 rag_mcp = FastMCP(name="mcp-rag")
 
@@ -247,6 +248,15 @@ async def rag_search(query: str, k: int = 3, ctx: Context | None = None) -> Dict
                 "snippet": d["text"][:600]  # show more context
             })
     return {"query": query, "results": results}
+
+# ---------------- Prompts ----------------
+@rag_mcp.prompt(tags={"rag"})
+def agent_prompt():
+    return Message("""
+    You are a RAG assistant. Always use the available tools (rag_rag_search, rag_rag_upsert) 
+    to answer questions. Do not answer directly, call the tools first.
+    """,
+    role="assistant")
 
 # ---------- Init ----------
 # if not _load_index():
