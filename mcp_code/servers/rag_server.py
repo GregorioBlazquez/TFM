@@ -3,7 +3,7 @@ import os, json, re
 from pathlib import Path
 from typing import List, Dict, Optional
 
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
