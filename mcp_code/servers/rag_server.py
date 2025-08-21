@@ -9,6 +9,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from fastmcp import FastMCP, Context
 from fastmcp.prompts.prompt import Message
+import pandas as pd
+from mcp.types import TextResourceContents
 
 rag_mcp = FastMCP(name="mcp-rag")
 
@@ -257,6 +259,132 @@ def agent_prompt():
     to answer questions. Do not answer directly, call the tools first.
     """,
     role="assistant")
+
+# ---------------- Resources ----------------
+from pathlib import Path
+import pandas as pd
+
+DATA_PATH = Path(__file__).resolve().parents[2] / "data/processed/num_tourists.csv"
+TOURIST_DATA = pd.read_csv(DATA_PATH, sep=";", parse_dates=["Period"])
+TOURIST_DATA.rename(columns={"CCAA": "region", "Total": "tourists"}, inplace=True)
+
+@rag_mcp.resource(
+    uri="historical://by-all",
+    name="HistoricalAll",
+    description="Return the entire historical tourist dataset grouped by period → region → value.",
+    mime_type="application/json",
+    tags={"tourism", "historical", "all"}
+)
+def historical_all() -> dict:
+    df = TOURIST_DATA.copy()
+    print(df)
+    output = {}
+    for p, group in df.groupby("Period"):
+        output[str(p.date())] = {
+            r: float(v) for r, v in zip(group["region"], group["tourists"])
+        }
+
+    print(output)
+    return output
+
+def normalize_region_name(region_input: str) -> str:
+    """ Normalize region names to match the dataset """
+    region_mapping = {
+        'andalucia': '01 Andalucía',
+        'andalucía': '01 Andalucía',
+        'balears': '04 Balears, Illes',
+        'baleares': '04 Balears, Illes',
+        'canarias': '05 Canarias',
+        'cataluña': '09 Cataluña',
+        'cataluna': '09 Cataluña',
+        'valenciana': '10 Comunitat Valenciana',
+        'valencia': '10 Comunitat Valenciana',
+        'comunidad valenciana': '10 Comunitat Valenciana',
+        'madrid': '13 Madrid, Comunidad de',
+        'comunidad de madrid': '13 Madrid, Comunidad de',
+        'total': 'Total',
+        'otras': 'Otras Comunidades Autónomas'
+    }
+    
+    normalized = region_mapping.get(region_input.lower(), region_input)
+    return normalized
+
+@rag_mcp.resource(
+    uri="historical://by-region-year/{year}/{region}",
+    name="HistoricalByRegionYear",
+    description="Return historical tourist data filtered by region and year.",
+    mime_type="application/json",
+    tags={"tourism", "historical", "region", "year"}
+)
+def historical_by_region_year(region: str, year: int) -> dict:
+    df = TOURIST_DATA.copy()
+    df = df[df["Period"].dt.year == year]
+
+    normalized_region = normalize_region_name(region)
+
+    if normalized_region != "Total":
+        df = df[df["region"] == normalized_region]
+    elif region == "Total":
+        df = df[df["region"] == "Total"]
+
+    if df.empty:
+        return {"error": f"No data found for region='{region}' and year='{year}'"}
+
+    output = {}
+    for p, group in df.groupby("Period"):
+        output[str(p.date())] = {
+            r: float(v) for r, v in zip(group["region"], group["tourists"])
+        }
+    return output
+
+@rag_mcp.resource(
+    uri="historical://by-year/{year}",
+    name="HistoricalByYear",
+    description="Return all historical tourist data for a given year across all regions.",
+    mime_type="application/json",
+    tags={"tourism", "historical", "year"}
+)
+def historical_by_year(year: int) -> dict:
+    df = TOURIST_DATA.copy()
+    df = df[df["Period"].dt.year == year]
+
+    if df.empty:
+        return {"error": f"No data found for year {year}"}
+
+    output = {}
+    for p, group in df.groupby("Period"):
+        output[str(p.date())] = {
+            r: float(v) for r, v in zip(group["region"], group["tourists"])
+        }
+    return output
+
+@rag_mcp.resource(
+    uri="historical://by-region/{region}",
+    name="HistoricalByRegion",
+    description="Return the full historical tourist data for a given region across all years.",
+    mime_type="application/json",
+    tags={"tourism", "historical", "region"}
+)
+def historical_by_region(region: str) -> dict:
+    df = TOURIST_DATA.copy()
+
+    normalize_region = normalize_region_name(region)
+
+    if normalize_region != "Total":
+        df = df[df["region"] == normalize_region]
+    else:
+        df = df[df["region"] == "Total"]
+
+    if df.empty:
+        return {"error": f"No data found for region '{region}'"}
+
+    output = {}
+    for p, group in df.groupby("Period"):
+        output[str(p.date())] = {
+            r: float(v) for r, v in zip(group["region"], group["tourists"])
+        }
+    return output
+
 
 # ---------- Init ----------
 # if not _load_index():

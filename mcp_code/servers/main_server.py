@@ -32,10 +32,10 @@ logging.basicConfig(
 main_mcp = FastMCP(name="main-mcp-server")
 
 # Log timing (tools/resources/prompts)
-main_mcp.add_middleware(DetailedTimingMiddleware())
+#main_mcp.add_middleware(DetailedTimingMiddleware())
 
 # Logging structured JSON of MCP requests (include truncated payloads)
-main_mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
+#main_mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
 
 ########### PROMPTS ##########
 @main_mcp.prompt
@@ -61,6 +61,7 @@ def supervisor_prompt():
     """,
     role="assistant")
 
+########## MCP SERVER ##########
 async def setup():
     # Mount existing MCP sub-servers
     main_mcp.mount(rag_mcp, prefix="rag")
