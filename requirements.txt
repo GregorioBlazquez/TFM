@@ -1,3 +1,8 @@
+# Requirements for the TFM project
+# Python version: 3.11.7
+
+# Jupyter and data manipulation for notebooks
+jupyter==1.0.0
 pandas==2.2.2
 numpy==1.26.4
 scikit-learn==1.4.2
@@ -9,23 +14,27 @@ upsetplot==0.9.0
 missingno==0.5.2
 kmodes==0.12.2
 adjustText==1.3.0
-jupyter==1.0.0
+shap==0.48.0
 pmdarima==2.0.4
+
+# Libraries for MCP server and API
+mcp==1.12.3
+fastmcp==2.11.3
 fastapi==0.111.0
 uvicorn==0.30.1
 joblib==1.4.2
 pydantic==2.7.1
-mcp==1.12.3
-fastmcp==2.11.3
 python-dotenv==1.0.1
 requests==2.32.3
+asyncio==4.0.0
+faiss_cpu==1.12.0
+pypdf==6.0.0
+
+# NLP and embeddings
 openai==1.98.0
 langchain==0.3.74
 langchain-core==0.3.74
 langchain-openai==0.3.29
 langchain_community==0.3.27
 langgraph==0.6.4
-asyncio==4.0.0
 sentence_transformers==5.1.0
-faiss_cpu==1.12.0
-pypdf==6.0.0
