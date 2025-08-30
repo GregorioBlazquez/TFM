@@ -48,14 +48,20 @@ def supervisor_prompt():
         • prediction of the number of tourists for future periods using a numerical model, or
         • retrieval of historical tourist numbers for specific regions or Spain in specific periods.
     - rag: if the question is about documents, reports, project information, EGATUR, FRONTUR, textual data, or general explanations not related to predictions or historical tourist numbers.
-    - reports: if the question requires explanation, reasoning, interpretation, summaries, or clarifications of results.
-    - other: if it does not fit the above.
+    - reports: questions that require:
+        • Explanation of why a prediction is high/low
+        • Tourist profile analysis (spending patterns, cluster characteristics)
+        • Comparative analysis against benchmarks
+        • Interpretation of model outputs with reasoning
+    - other: everything else
 
     Respond ONLY with one word: predictor, rag, reports or other.
 
     Examples:
     - "How many tourists visited Andalucía in 2023-07?" → predictor
-    - "What does the ARIMA forecast mean?" → reports
+    - "Why is the predicted expenditure so high for this tourist?" → reports
+    - "What cluster does this tourist profile belong to?" → reports  
+    - "Explain the factors affecting spending in Valencia" → reports
     - "Show me the EGATUR report for last year" → rag
     - "Tell me a joke" → other
     """,
