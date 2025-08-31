@@ -1,11 +1,14 @@
+import asyncio
+import os
+import json
+import logging
+from typing import TypedDict, List, Optional, Dict
+
+from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import AzureChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
-import asyncio, os
-from dotenv import load_dotenv
-import logging
-from typing import TypedDict, List, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 ########## ENVIRONMENT VARIABLES ##########
@@ -49,9 +52,10 @@ class AgentState(TypedDict):
     last_intent: str
     # Prepared input for report agent (optional)
     report_agent_input: Optional[str]
-    # Needed for routing
+    # For routing and results
+    agents_to_call: Optional[List[str]]
+    collected_outputs: Optional[Dict[str, object]]
     next_node: str
-    # Answer to return to user
     result: str
 
 # --- LLM for routing/intent classification ---
@@ -78,8 +82,12 @@ llm_reasoning = AzureChatOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY")
 )
 
-# Global variable for supervisor prompt
-SUPERVISOR_PROMPT = ""
+# fallback supervisor prompt (use MCP stored prompt in build_agents when possible)
+SUPERVISOR_PROMPT_FALLBACK = """
+You are an intent classifier. Return JSON ONLY, example:
+{"intent":"reports","agents":["predictor","rag"]}
+See the project instructions for mapping user queries to agents.
+"""
 
 # --- Build agent instances ---
 async def build_agents(session):
@@ -91,9 +99,10 @@ async def build_agents(session):
     report_prompt = await session.get_prompt("report_agent_prompt")
     supervisor_prompt = await session.get_prompt("supervisor_prompt")
 
-    # Save supervisor prompt globally
-    global SUPERVISOR_PROMPT
-    SUPERVISOR_PROMPT = supervisor_prompt.messages[0].content.text if supervisor_prompt.messages else ""
+    # Use loaded supervisor prompt if present, otherwise fallback
+    global SUPERVISOR_PROMPT_FALLBACK
+    if supervisor_prompt and supervisor_prompt.messages:
+        SUPERVISOR_PROMPT_FALLBACK = supervisor_prompt.messages[0].content.text
 
     # Filter tools by prefix
     api_tools = [t for t in tools if t.name.startswith("api_")]
@@ -101,10 +110,10 @@ async def build_agents(session):
 
     # Create react agents with tools and prompts
     predictor_agent = create_react_agent(llm_agents, api_tools)
-    rag_agent = create_react_agent(llm_agents, rag_tools, 
-                                  prompt=rag_prompt.messages[0].content.text if rag_prompt.messages else "")
-    reports_agent = create_react_agent(llm_reasoning, [], 
-                                      prompt=report_prompt.messages[0].content.text if report_prompt.messages else "")
+    rag_agent = create_react_agent(llm_agents, rag_tools,
+                                  prompt=rag_prompt.messages[0].content.text if rag_prompt and rag_prompt.messages else "")
+    reports_agent = create_react_agent(llm_reasoning, [],
+                                      prompt=report_prompt.messages[0].content.text if report_prompt and report_prompt.messages else "")
 
     return predictor_agent, rag_agent, reports_agent
 
@@ -131,7 +140,7 @@ async def run_predictor(state: AgentState, predictor):
     state["last_agent_output"] = result
     
     return {
-        "result": answer, 
+        "result": answer,
         "last_agent_output": result,
         "messages": state["messages"]
     }
@@ -158,7 +167,7 @@ async def run_rag(state: AgentState, rag):
     state["last_agent_output"] = result
     
     return {
-        "result": answer, 
+        "result": answer,
         "last_agent_output": result,
         "messages": state["messages"]
     }
@@ -168,37 +177,24 @@ async def run_reports(state: AgentState, reports):
 
     # Initialize messages list if not exists
     state.setdefault("messages", [])
-    
-    # Prepare messages based on available context
-    if "report_agent_input" in state:
-        logger.info(f"[Reports] Using prepared context from previous agent")
-        # Use prepared system message for context-aware reporting
+    if state.get("report_agent_input"):
+        logger.info("[Reports] Using prepared context")
         messages = [{"role": "system", "content": state["report_agent_input"]}]
     else:
-        # Fallback: use standard conversation flow
         query = state["last_query"]
         logger.info(f"[Reports] Using standard query: {query}")
         state["messages"].append(HumanMessage(content=query))
         messages = state["messages"]
-
-    logger.info(f"[Reports] Messages sent to LLM: {len(messages)} messages")
-
+    logger.info(f"[Reports] Messages sent to LLM: {len(messages)}")
     result = await reports.ainvoke({"messages": messages})
     answer = extract_answer(result)
     logger.info(f"[Reports] Raw result: {result}")
-
-    # Add agent response to conversation history
     state["messages"].append(AIMessage(content=answer))
-    
-    # Store raw output
     state["last_agent_output"] = result
-    
-    # Clean up prepared input for next iteration
     if "report_agent_input" in state:
         del state["report_agent_input"]
-    
     return {
-        "result": answer, 
+        "result": answer,
         "last_agent_output": result,
         "messages": state["messages"]
     }
@@ -207,7 +203,7 @@ async def prepare_for_reports(state: AgentState):
     logger.info(f"[Prep Reports] Preparing context for report agent...")
 
     user_question = state["last_query"]
-    raw_data = state.get("last_agent_output", {})
+    raw_data = state.get("last_agent_output", {})  # now will be a dict of outputs
 
     # Create comprehensive context for report agent
     system_message = f"""
@@ -217,45 +213,36 @@ async def prepare_for_reports(state: AgentState):
     "{user_question}"
 
     RAW DATA TO ANALYZE:
-    {raw_data}
+    {json.dumps(raw_data, default=str, indent=2)}
 
     Provide a clear, concise explanation in English. Focus on:
-    1. Interpreting the numerical results
+    1. Interpreting the numerical results or cluster assignments
     2. Explaining patterns or anomalies
     3. Providing context-aware insights
     4. Relating findings to tourism industry context
 
     Do not call any tools - use only reasoning and analysis.
     """
-
     return {
         "report_agent_input": system_message,
         "result": state.get("result") or "[prepared context]"
     }
 
 async def handle_other(state: AgentState):
-    logger.info(f"[Other] Handling unsupported query...")
-    
+    logger.info("[Other] Unsupported query")
     msg = "I'm sorry, I cannot handle this type of query with my current capabilities."
-    
-    # Initialize messages list if not exists
     state.setdefault("messages", [])
-    
-    # Add error response to conversation history
     state["messages"].append(AIMessage(content=msg))
-    
-    # Store symbolic output
     state["last_agent_output"] = {"content": msg}
-    
     return {
-        "result": msg, 
+        "result": msg,
         "last_agent_output": {"content": msg},
         "messages": state["messages"]
     }
 
-# --- Supervisor Node ---
+# --- Supervisor: returns intent and agents_to_call (writes into state) ---
 async def supervisor(state: AgentState):
-    query = state["last_query"].lower()
+    query = state["last_query"]
     logger.info(f"[Supervisor] Routing query: {query}")
 
     # Build conversation history from messages
@@ -268,42 +255,74 @@ async def supervisor(state: AgentState):
 
     # Prepare classification prompt
     classification_prompt = [
-        {"role": "system", "content": SUPERVISOR_PROMPT},
+        {"role": "system", "content": SUPERVISOR_PROMPT_FALLBACK},
         {"role": "user", "content": conversation_history + f"User: {query}\n"}
     ]
 
-    logger.debug(f"[Supervisor] Classification prompt: {classification_prompt}")
+    raw_response = await llm_router.ainvoke(classification_prompt)
+    resp_text = ""
+    try:
+        # try to access content robustly
+        resp_text = raw_response.content.strip() if hasattr(raw_response, "content") else str(raw_response)
+    except Exception:
+        resp_text = str(raw_response)
 
-    # Get classification from router LLM
-    classification = (await llm_router.ainvoke(classification_prompt)).content.strip().lower()
-    logger.info(f"[Supervisor] Classification result: {classification}")
+    logger.debug(f"[Supervisor] raw LLM response: {resp_text}")
 
-    # Validate and return classification
-    if classification not in ["predictor", "rag", "reports"]:
-        return "other"
-    return classification
+    # Attempt to parse JSON. Fallback to heuristics.
+    intent = "other"
+    agents: List[str] = []
 
-# --- Supervisor Node Wrapper ---
+    try:
+        parsed = json.loads(resp_text)
+        intent = parsed.get("intent", "other").lower()
+        agents = [a.lower() for a in parsed.get("agents", [])]
+    except Exception:
+        # fallback heuristic
+        t = resp_text.lower()
+        if "reports" in t or "explain" in t or "why" in t or "interpret" in t:
+            intent = "reports"
+            # conservative: ask both if ambiguous
+            agents = ["predictor", "rag"]
+        elif "egatur" in t or "frontur" in t or "pdf" in t or "document" in t:
+            intent = "rag"
+            agents = ["rag"]
+        else:
+            intent = "predictor"
+            agents = ["predictor"]
+
+    # Normalize agents (only allow predictor/rag)
+    agents = [a for a in agents if a in ("predictor", "rag")]
+
+    state["agents_to_call"] = agents
+    state["last_intent"] = intent
+
+    logger.info(f"[Supervisor] intent={intent}, agents_to_call={agents}")
+
+    # For routing we set next_node to the intent name (StateGraph maps those to dispatch)
+    return intent
+
+# --- Supervisor node wrapper (sets next_node) ---
 async def supervisor_node(state: AgentState):
     intent = await supervisor(state)
     return {
-    "next_node": intent,
-    "last_intent": intent,
-    "result": state.get("result")
-}
+        "next_node": intent,
+        "last_intent": intent,
+        "result": state.get("result"),
+        "agents_to_call": state.get("agents_to_call")
+    }
 
-########## HELPER FUNCTIONS ##########
+########## HELPER: extract text answer from agent result ##########
 def extract_answer(result) -> str:
-    """
-    Extracts the text response from LangGraph agent's result.
-    Looks for the last AI message content in result['messages'].
-    Fallback: returns string representation of result.
-    """
     try:
         messages = result.get("messages", [])
         for msg in reversed(messages):
-            if hasattr(msg, 'type') and msg.type == "ai" and hasattr(msg, 'content'):
+            # adapt to possible shapes
+            if hasattr(msg, "type") and msg.type == "ai" and hasattr(msg, "content"):
                 return msg.content
+            # fallback if msg is mapping-like
+            if isinstance(msg, dict) and msg.get("role") in ("assistant", "ai") and msg.get("content"):
+                return msg["content"]
         return str(result)
     except Exception as e:
         logger.warning(f"Failed to extract answer: {e}")
@@ -311,7 +330,6 @@ def extract_answer(result) -> str:
 
 ########## MAIN APPLICATION LOOP ##########
 async def main():
-    # Initialize MCP client
     client = MultiServerMCPClient({
         "main": {"url": MCP_BASE, "transport": "streamable_http"}
     })
@@ -336,48 +354,119 @@ async def main():
         async def prepare_reports_node(s):
             return await prepare_for_reports(s)
 
-        # Add all nodes to workflow
+        # Dispatcher: executes the requested agents in sequence and consolidates outputs
+        async def dispatch_node(s: AgentState):
+            logger.info("[Dispatch] Running requested agents...")
+            agents = s.get("agents_to_call") or []
+            collected: Dict[str, object] = {}
+            s.setdefault("messages", [])
+
+            last_result = None
+            for ag in agents:
+                if ag == "predictor":
+                    out = await run_predictor(s, predictor)
+                elif ag == "rag":
+                    out = await run_rag(s, rag)
+                else:
+                    logger.warning(f"[Dispatch] Unknown agent requested: {ag}")
+                    continue
+
+                # out is a dict with keys result,last_agent_output,messages
+                collected[ag] = out.get("last_agent_output") or out.get("result")
+                last_result = out.get("result") or last_result
+
+            # Persist collected outputs
+            s["collected_outputs"] = collected
+            s["last_agent_output"] = collected
+
+            # Clear agents_to_call so it doesn't leak into next turn
+            s["agents_to_call"] = None
+
+            intent = s.get("last_intent", "other")
+            if intent == "reports":
+                s["next_node"] = "prepare_reports"
+            else:
+                s["next_node"] = "done"
+
+            # If this was predictor-only or rag-only, return the real agent result
+            if last_result:
+                s["result"] = last_result
+
+            logger.info(f"[Dispatch] collected outputs keys: {list(collected.keys())}, next_node={s['next_node']}")
+            return {
+                "result": s.get("result") or "[dispatched]",
+                "last_agent_output": s["last_agent_output"],
+                "messages": s.get("messages"),
+                "next_node": s["next_node"],
+                "collected_outputs": s["collected_outputs"],
+                "agents_to_call": s.get("agents_to_call")
+            }
+
+        async def done_node(s):
+            # Terminal node that simply returns the accumulated result (for predictor-only or rag-only queries)
+            return {
+                "result": s.get("result") or "[done]",
+                "last_agent_output": s.get("last_agent_output"),
+                "messages": s.get("messages"),
+                "collected_outputs": s.get("collected_outputs")
+            }
+        
+        # Add nodes
         workflow.add_node("supervisor", supervisor_node)
+        workflow.add_node("dispatch", dispatch_node)
         workflow.add_node("predictor", predictor_node)
         workflow.add_node("rag", rag_node)
         workflow.add_node("prepare_reports", prepare_reports_node)
         workflow.add_node("reports", reports_node)
+        workflow.add_node("done", done_node)
         workflow.add_node("other", handle_other)
 
-        # Define workflow edges
+        # Edges
         workflow.add_edge(START, "supervisor")
-        
-        # Conditional routing based on supervisor's decision
+
+        # Supervisor -> dispatch for predictor/rag/reports. 'other' goes to other.
         workflow.add_conditional_edges(
             "supervisor",
             lambda state: state.get("next_node", "other"),
             {
-                "predictor": "predictor",
-                "rag": "rag", 
-                "reports": "prepare_reports",
+                "predictor": "dispatch",
+                "rag": "dispatch",
+                "reports": "dispatch",
                 "other": "other",
             }
         )
 
-        # Connect preparation to report generation
+        # Dispatch -> either prepare_reports (if reports) or done (terminal)
+        workflow.add_conditional_edges(
+            "dispatch",
+            lambda state: state.get("next_node", "done"),
+            {
+                "prepare_reports": "prepare_reports",
+                "done": "done",
+            }
+        )
+
+        # prepare_reports -> reports
         workflow.add_edge("prepare_reports", "reports")
 
-        # Define terminal nodes
+        # terminal edges
         workflow.add_edge("predictor", END)
         workflow.add_edge("rag", END)
         workflow.add_edge("reports", END)
+        workflow.add_edge("done", END)
         workflow.add_edge("other", END)
 
-        # Compile workflow
         app = workflow.compile()
 
-        # Initialize empty state
         initial_state: AgentState = {
             "messages": [],
             "last_query": "",
             "last_agent_output": None,
             "last_intent": "",
             "report_agent_input": None,
+            "agents_to_call": None,
+            "collected_outputs": None,
+            "next_node": "",
             "result": ""
         }
 
@@ -395,7 +484,7 @@ async def main():
 
                 # Process query through workflow
                 result_state = await app.ainvoke(initial_state)
-                
+
                 # Update persistent state
                 for k, v in result_state.items():
                     if v is not None:
