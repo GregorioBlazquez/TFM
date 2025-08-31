@@ -4,11 +4,16 @@ import joblib
 from datetime import datetime
 from api.schemas import VALID_REGIONS
 import pandas as pd
+from typing import Optional, Dict, List, Tuple
+import numpy as np
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/processed/num_tourists.csv")
 
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models/arima")
+ARIMA_MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models/arima")
+CLUSTER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/cluster/cluster_classifier_eda_nn.joblib")
+EXPENDITURE_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/daily_avg_exp/expenditure_model.pkl")
 
+# --- Helpers ---
 def parse_period(period_str: str) -> datetime:
     try:
         return datetime.strptime(period_str, "%Y%m")
@@ -17,12 +22,16 @@ def parse_period(period_str: str) -> datetime:
         month = int(period_str[-2:])
         return datetime(year, month, 1)
 
+def log_transform(x):
+    return np.log1p(x)
+
+# --- Tourist prediction (ARIMA) ---
 def predict_tourists(region: str, period: str):
     if region not in VALID_REGIONS:
         raise ValueError(f"Region '{region}' not recognized. Valid: {VALID_REGIONS}")
 
     model_filename = f"arima_model_{region}.pkl"
-    model_path = os.path.join(MODELS_DIR, model_filename)
+    model_path = os.path.join(ARIMA_MODELS_DIR, model_filename)
 
     if not os.path.exists(model_path):
         raise ValueError(f"Model file not found for region '{region}'.")
@@ -45,6 +54,7 @@ def predict_tourists(region: str, period: str):
 
     return pred_value, lower_ci, upper_ci, f"ARIMA-{region}"
 
+# --- Historical data ---
 TOURIST_DATA = pd.read_csv(DATA_PATH, sep=';', parse_dates=['Period'])
 TOURIST_DATA.rename(columns={"CCAA": "region", "Total": "tourists"}, inplace=True)
 
@@ -73,3 +83,32 @@ def get_historical_tourists(region: Optional[str] = None, period: Optional[str] 
 
     return output
 
+# --- Tourist clustering ---
+def predict_cluster(features: Dict) -> int:
+    nn_pipeline = joblib.load(CLUSTER_MODEL_PATH)
+
+    X = pd.DataFrame([features])
+    cluster = int(nn_pipeline.predict(X)[0])
+    return cluster
+
+
+# --- Expenditure regression with SHAP ---
+def predict_expenditure(features: Dict) -> Tuple[float, List[Dict[str, float]]]:
+    model_data = joblib.load(EXPENDITURE_MODEL_PATH)
+    regressor = model_data["model"]
+    preproc = model_data["preprocessor"]
+    explainer = model_data["explainer"]
+
+    X = pd.DataFrame([features])
+    X_trans = preproc.transform(X)
+
+    pred = float(regressor.predict(X_trans)[0])
+
+    shap_values = explainer(X_trans)
+    feature_names = preproc.get_feature_names_out()
+    shap_list = [
+        {"feature": fname, "impact": float(val)} 
+        for fname, val in zip(feature_names, shap_values.values[0])
+    ]
+
+    return pred, shap_list

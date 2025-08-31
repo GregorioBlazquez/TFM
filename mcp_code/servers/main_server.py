@@ -13,6 +13,9 @@ from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
 from fastmcp.prompts.prompt import Message
 
+import numpy as np
+def log_transform(x):
+    return np.log1p(x)
 
 ########## ENV VARS ##########
 # Load environment variables
