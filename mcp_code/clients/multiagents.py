@@ -98,6 +98,7 @@ async def build_agents(session):
     rag_prompt = await session.get_prompt("rag_agent_prompt")
     report_prompt = await session.get_prompt("report_agent_prompt")
     supervisor_prompt = await session.get_prompt("supervisor_prompt")
+    predictor_prompt = await session.get_prompt("predictor_prompt")
 
     # Use loaded supervisor prompt if present, otherwise fallback
     global SUPERVISOR_PROMPT_FALLBACK
@@ -109,7 +110,8 @@ async def build_agents(session):
     rag_tools = [t for t in tools if t.name.startswith("rag_")]
 
     # Create react agents with tools and prompts
-    predictor_agent = create_react_agent(llm_agents, api_tools)
+    predictor_agent = create_react_agent(llm_agents, api_tools,
+                                    prompt=predictor_prompt.messages[0].content.text if predictor_prompt and predictor_prompt.messages else "")
     rag_agent = create_react_agent(llm_agents, rag_tools,
                                   prompt=rag_prompt.messages[0].content.text if rag_prompt and rag_prompt.messages else "")
     reports_agent = create_react_agent(llm_reasoning, [],
@@ -382,6 +384,14 @@ async def main():
             # Clear agents_to_call so it doesn't leak into next turn
             s["agents_to_call"] = None
 
+            # Always send to reports (even if only predictor or rag was used)
+            s["next_node"] = "prepare_reports"
+
+            # Keep raw result in state (reports agent will reformat)
+            if last_result:
+                s["result"] = last_result
+
+            """
             intent = s.get("last_intent", "other")
             if intent == "reports":
                 s["next_node"] = "prepare_reports"
@@ -391,6 +401,7 @@ async def main():
             # If this was predictor-only or rag-only, return the real agent result
             if last_result:
                 s["result"] = last_result
+            """
 
             logger.info(f"[Dispatch] collected outputs keys: {list(collected.keys())}, next_node={s['next_node']}")
             return {
@@ -436,6 +447,10 @@ async def main():
             }
         )
 
+        # Dispatch always leads to prepare_reports
+        workflow.add_edge("dispatch", "prepare_reports")
+
+        """
         # Dispatch -> either prepare_reports (if reports) or done (terminal)
         workflow.add_conditional_edges(
             "dispatch",
@@ -445,6 +460,7 @@ async def main():
                 "done": "done",
             }
         )
+        """
 
         # prepare_reports -> reports
         workflow.add_edge("prepare_reports", "reports")

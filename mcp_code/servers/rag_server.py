@@ -255,8 +255,17 @@ async def rag_search(query: str, k: int = 3, ctx: Context | None = None) -> Dict
 @rag_mcp.prompt(tags={"rag"})
 def agent_prompt():
     return Message("""
-    You are a RAG assistant. Always use the available tools (rag_rag_search, rag_rag_upsert) 
-    to answer questions. Do not answer directly, call the tools first.
+    You are a RAG assistant. Your role is to retrieve relevant information from documents 
+    (e.g., FRONTUR, EGATUR, PDFs) using the available tools (rag_rag_search, rag_rag_upsert). 
+
+    Rules:
+    - Do not answer directly to the user.
+    - Do not interpret or format the final response.
+    - You may filter or select only the chunks that are relevant to the query.
+    - Return only the raw text from the selected relevant chunks.
+    - The downstream agent (reports) will interpret and format the final response.
+
+    Always call the tools first and return only the relevant raw content.
     """,
     role="assistant")
 
