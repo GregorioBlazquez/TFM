@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TFM Multi-Agent Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: scroll; }
+        .user { color: blue; margin: 5px 0; }
+        .bot { color: green; margin: 5px 0; }
+        #input-container { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>TFM Multi-Agent Chat</h1>
+    <div id="chat"></div>
+
+    <div id="input-container">
+        <input type="text" id="question" placeholder="Type your question" style="width: 70%;">
+        <button onclick="sendQuestion()">Send</button>
+    </div>
+
+    <script>
+        const chatDiv = document.getElementById('chat');
+
+    const userId = 'demo_user';  // For basic multi-user, later replace with login
+
+        async function sendQuestion() {
+            const questionInput = document.getElementById('question');
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+
+            // Show user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'user';
+            userMsg.textContent = `You: ${question}`;
+            chatDiv.appendChild(userMsg);
+
+            questionInput.value = '';
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question, user_id: userId })
+                });
+                const data = await response.json();
+
+
+                // Show bot response
+                const botMsg = document.createElement('div');
+                botMsg.className = 'bot';
+                botMsg.textContent = `Bot: ${data.answer}`;
+                chatDiv.appendChild(botMsg);
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+
+            } catch (error) {
+                const errMsg = document.createElement('div');
+                errMsg.className = 'bot';
+                errMsg.textContent = `Error: ${error}`;
+                chatDiv.appendChild(errMsg);
+            }
+        }
+
+        // Allow sending with Enter
+        document.getElementById('question').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendQuestion();
+        });
+    </script>
+</body>
+</html>

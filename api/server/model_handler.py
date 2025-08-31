@@ -2,16 +2,16 @@ import os
 from typing import Optional
 import joblib
 from datetime import datetime
-from api.schemas import VALID_REGIONS
+from api.server.schemas import VALID_REGIONS
 import pandas as pd
 from typing import Optional, Dict, List, Tuple
 import numpy as np
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/processed/num_tourists.csv")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "../../data/processed/num_tourists.csv")
 
-ARIMA_MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models/arima")
-CLUSTER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/cluster/cluster_classifier_eda_nn.joblib")
-EXPENDITURE_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/daily_avg_exp/expenditure_model.pkl")
+ARIMA_MODELS_DIR = os.path.join(os.path.dirname(__file__), "../../models/arima")
+CLUSTER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/cluster/cluster_classifier_eda_nn.joblib")
+EXPENDITURE_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/daily_avg_exp/expenditure_model.pkl")
 
 # --- Helpers ---
 def parse_period(period_str: str) -> datetime:

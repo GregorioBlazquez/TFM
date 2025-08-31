@@ -1,13 +1,13 @@
 from fastapi import FastAPI, HTTPException
-from api.schemas import (
+from api.server.schemas import (
     ArimaInput, ArimaOutput, HistoricalInput, HistoricalOutput,
     TouristFeatures, ClusterOutput, ExpenditureOutput
 )
-from api.model_handler import (
+from api.server.model_handler import (
     predict_tourists, get_historical_tourists,
     predict_cluster, predict_expenditure
 )
-from api.schemas import REGION_DESCRIPTION
+from api.server.schemas import REGION_DESCRIPTION
 
 app = FastAPI(title="Tourist Prediction API")
 

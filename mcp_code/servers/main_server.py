@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from mcp_code.servers.rag_server import rag_mcp
 from mcp_code.servers.report_server import report_mcp
-from api.main import app as fastapi_app
+from api.server.main import app as fastapi_app
 import logging
 from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware

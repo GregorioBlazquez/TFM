@@ -330,21 +330,8 @@ def extract_answer(result) -> str:
         logger.warning(f"Failed to extract answer: {e}")
         return str(result)
 
-########## MAIN APPLICATION WOEKFLOW ##########
-initial_state = {
-    "messages": [],
-    "last_query": "",
-    "last_agent_output": None,
-    "last_intent": "",
-    "report_agent_input": None,
-    "agents_to_call": None,
-    "collected_outputs": None,
-    "next_node": "",
-    "result": ""
-}
-
-
-async def get_workflow():
+########## MAIN APPLICATION LOOP ##########
+async def main():
     client = MultiServerMCPClient({
         "main": {"url": MCP_BASE, "transport": "streamable_http"}
     })
@@ -485,4 +472,52 @@ async def get_workflow():
         workflow.add_edge("done", END)
         workflow.add_edge("other", END)
 
-        return workflow.compile()
+        app = workflow.compile()
+
+        initial_state: AgentState = {
+            "messages": [],
+            "last_query": "",
+            "last_agent_output": None,
+            "last_intent": "",
+            "report_agent_input": None,
+            "agents_to_call": None,
+            "collected_outputs": None,
+            "next_node": "",
+            "result": ""
+        }
+
+        # Main interaction loop
+        while True:
+            try:
+                user_input = input("Question: ").strip()
+                if user_input.lower() in ["exit", "quit", "salir"]:
+                    break
+                if not user_input:
+                    continue
+
+                # Update state with new user input
+                initial_state["last_query"] = user_input
+
+                # Process query through workflow
+                result_state = await app.ainvoke(initial_state)
+
+                # Update persistent state
+                for k, v in result_state.items():
+                    if v is not None:
+                        initial_state[k] = v
+                
+                # Display result to user
+                print("---")
+                print(result_state)
+                print("Answer:", result_state["result"])
+                print("---")
+
+            except KeyboardInterrupt:
+                print("\nExiting...")
+                break
+            except Exception as e:
+                logger.error(f"Error in main loop: {e}")
+                print("Sorry, I encountered an error. Please try again.")
+
+if __name__ == "__main__":
+    asyncio.run(main())
