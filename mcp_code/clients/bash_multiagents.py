@@ -4,17 +4,12 @@ import json
 import logging
 from typing import TypedDict, List, Optional, Dict
 
-from dotenv import load_dotenv
+from config import get_env_var, load_environment
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import AzureChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-
-########## ENVIRONMENT VARIABLES ##########
-# Load environment variables
-load_dotenv()
-MCP_BASE = os.getenv("MCP_BASE", "http://127.0.0.1:8080/mcp/")
 
 ########## LOGGING CONFIGURATION ##########
 logging.basicConfig(
@@ -39,6 +34,34 @@ for noisy in (
 
 logger = logging.getLogger("multiagent-client")
 
+########## ENVIRONMENT VARIABLES ##########
+load_environment()
+
+# Check loaded enviroment variables
+required_vars = [
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT", 
+    "AZURE_OPENAI_DEPLOYMENT",
+    "AZURE_OPENAI_ROUTER_DEPLOYMENT",
+    "AZURE_OPENAI_REASONING_DEPLOYMENT",
+    "MCP_BASE"
+]
+
+missing_vars = [var for var in required_vars if not get_env_var(var)]
+if missing_vars:
+    logger.error(f"❌ Missing required environment variables: {missing_vars}")
+    raise ValueError(f"Missing environment variables: {missing_vars}")
+logger.info("✓ All required environment variables are present")
+
+# Load environment variables
+MCP_BASE = get_env_var("MCP_BASE", "http://127.0.0.1:8080/mcp/")
+AZURE_OPENAI_API_KEY = get_env_var("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = get_env_var("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_VERSION = get_env_var("AZURE_OPENAI_API_VERSION")
+AZURE_OPENAI_DEPLOYMENT = get_env_var("AZURE_OPENAI_DEPLOYMENT")
+AZURE_OPENAI_ROUTER_DEPLOYMENT = get_env_var("AZURE_OPENAI_ROUTER_DEPLOYMENT")
+AZURE_OPENAI_REASONING_DEPLOYMENT = get_env_var("AZURE_OPENAI_REASONING_DEPLOYMENT")
+
 ########## LANGGRAPH AGENTS ##########
 # --- State schema for our multi-agent system ---
 class AgentState(TypedDict):
@@ -60,26 +83,26 @@ class AgentState(TypedDict):
 
 # --- LLM for routing/intent classification ---
 llm_router = AzureChatOpenAI(
-    azure_deployment=os.getenv("AZURE_OPENAI_ROUTER_DEPLOYMENT"),
-    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    azure_deployment=AZURE_OPENAI_ROUTER_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY
 )
 
 # --- LLM for main agents (predictor, RAG) ---
 llm_agents = AzureChatOpenAI(
-    azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    azure_deployment=AZURE_OPENAI_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY
 )
 
 # --- LLM for reasoning/report agent ---
 llm_reasoning = AzureChatOpenAI(
-    azure_deployment=os.getenv("AZURE_OPENAI_REASONING_DEPLOYMENT"),
-    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    azure_deployment=AZURE_OPENAI_REASONING_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY
 )
 
 # fallback supervisor prompt (use MCP stored prompt in build_agents when possible)

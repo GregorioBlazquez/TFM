@@ -1,16 +1,14 @@
 import os
 import asyncio
-from dotenv import load_dotenv
+from config import get_env_var
 from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import AzureChatOpenAI
 from langchain import hub
 
 
-load_dotenv()
-
-MCP_BASE = os.getenv("MCP_BASE", "http://127.0.0.1:8080/mcp/")
-AZ_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+MCP_BASE = get_env_var("MCP_BASE", "http://127.0.0.1:8080/mcp/")
+AZ_DEPLOYMENT = get_env_var("AZURE_OPENAI_DEPLOYMENT")
 
 async def main():
     client = MultiServerMCPClient({
@@ -33,9 +31,9 @@ async def main():
         # Initialize the Azure LLM
         llm = AzureChatOpenAI(
             azure_deployment=AZ_DEPLOYMENT,
-            openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_key=os.getenv("AZURE_OPENAI_API_KEY")
+            openai_api_version=get_env_var("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
+            azure_endpoint=get_env_var("AZURE_OPENAI_ENDPOINT"),
+            api_key=get_env_var("AZURE_OPENAI_API_KEY")
         )
 
         # Create the agent with the LLM and MCP tools

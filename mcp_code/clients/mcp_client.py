@@ -1,20 +1,19 @@
 import os
 import json
-from dotenv import load_dotenv
+from config import get_env_var
 from openai import AzureOpenAI
 from fastmcp import Client
 import asyncio
 
-load_dotenv()
 
 # Configuración
-AZ_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-AZ_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT").rstrip("/")
-AZ_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
-AZ_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+AZ_API_KEY = get_env_var("AZURE_OPENAI_API_KEY")
+AZ_ENDPOINT = get_env_var("AZURE_OPENAI_ENDPOINT").rstrip("/")
+AZ_DEPLOYMENT = get_env_var("AZURE_OPENAI_DEPLOYMENT")
+AZ_API_VERSION = get_env_var("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
-MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
-MCP_PORT = int(os.getenv("MCP_PORT", "8080"))
+MCP_HOST = get_env_var("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(get_env_var("MCP_PORT", "8080"))
 MCP_BASE = f"http://{MCP_HOST}:{MCP_PORT}/mcp/"
 
 # Clientes

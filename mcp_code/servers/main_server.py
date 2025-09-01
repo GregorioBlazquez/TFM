@@ -3,7 +3,7 @@ import os
 import asyncio
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
-from dotenv import load_dotenv
+from config import get_env_var
 from fastmcp import FastMCP
 from mcp_code.servers.rag_server import rag_mcp
 from mcp_code.servers.report_server import report_mcp
@@ -12,6 +12,7 @@ import logging
 from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
 from fastmcp.prompts.prompt import Message
+from pathlib import Path
 
 import numpy as np
 def log_transform(x):
@@ -19,9 +20,8 @@ def log_transform(x):
 
 ########## ENV VARS ##########
 # Load environment variables
-load_dotenv()
-MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
-MCP_PORT = int(os.getenv("MCP_PORT", 8080))
+MCP_HOST = get_env_var("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(get_env_var("MCP_PORT", 8080))
 
 ########## LOGGING ##########
 # Initialize logging

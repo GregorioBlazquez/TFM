@@ -12,6 +12,8 @@ from fastmcp.prompts.prompt import Message
 import pandas as pd
 from mcp.types import TextResourceContents
 
+from config import get_env_var
+
 rag_mcp = FastMCP(name="mcp-rag")
 
 # --- Paths ---
@@ -22,7 +24,7 @@ DOCS_PATH = DATA_DIR / "docs_meta.json"
 DOCS_DIR = Path(__file__).resolve().parents[2] / "docs"
 
 # --- Embeddings + Index ---
-MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+MODEL_NAME = get_env_var("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 embedder = SentenceTransformer(MODEL_NAME)
 dimension = embedder.get_sentence_embedding_dimension()
 

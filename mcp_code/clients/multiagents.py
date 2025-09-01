@@ -1,20 +1,16 @@
 import asyncio
+from http.client import HTTPException
 import os
 import json
 import logging
 from typing import TypedDict, List, Optional, Dict
 
-from dotenv import load_dotenv
+from config import get_env_var, load_environment
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import AzureChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-
-########## ENVIRONMENT VARIABLES ##########
-# Load environment variables
-load_dotenv()
-MCP_BASE = os.getenv("MCP_BASE", "http://127.0.0.1:8080/mcp/")
 
 ########## LOGGING CONFIGURATION ##########
 logging.basicConfig(
@@ -39,6 +35,34 @@ for noisy in (
 
 logger = logging.getLogger("multiagent-client")
 
+########## ENVIRONMENT VARIABLES ##########
+load_environment()
+
+# Check loaded enviroment variables
+required_vars = [
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT", 
+    "AZURE_OPENAI_DEPLOYMENT",
+    "AZURE_OPENAI_ROUTER_DEPLOYMENT",
+    "AZURE_OPENAI_REASONING_DEPLOYMENT",
+    "MCP_BASE"
+]
+
+missing_vars = [var for var in required_vars if not get_env_var(var)]
+if missing_vars:
+    logger.error(f"❌ Missing required environment variables: {missing_vars}")
+    raise ValueError(f"Missing environment variables: {missing_vars}")
+logger.info("✓ All required environment variables are present")
+
+# Load environment variables
+MCP_BASE = get_env_var("MCP_BASE", "http://127.0.0.1:8080/mcp/")
+AZURE_OPENAI_API_KEY = get_env_var("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = get_env_var("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_VERSION = get_env_var("AZURE_OPENAI_API_VERSION")
+AZURE_OPENAI_DEPLOYMENT = get_env_var("AZURE_OPENAI_DEPLOYMENT")
+AZURE_OPENAI_ROUTER_DEPLOYMENT = get_env_var("AZURE_OPENAI_ROUTER_DEPLOYMENT")
+AZURE_OPENAI_REASONING_DEPLOYMENT = get_env_var("AZURE_OPENAI_REASONING_DEPLOYMENT")
+
 ########## LANGGRAPH AGENTS ##########
 # --- State schema for our multi-agent system ---
 class AgentState(TypedDict):
@@ -60,26 +84,29 @@ class AgentState(TypedDict):
 
 # --- LLM for routing/intent classification ---
 llm_router = AzureChatOpenAI(
-    azure_deployment=os.getenv("AZURE_OPENAI_ROUTER_DEPLOYMENT"),
-    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    azure_deployment=AZURE_OPENAI_ROUTER_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY,
+    timeout=60.0
 )
 
 # --- LLM for main agents (predictor, RAG) ---
 llm_agents = AzureChatOpenAI(
-    azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    azure_deployment=AZURE_OPENAI_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY,
+    timeout=60.0
 )
 
 # --- LLM for reasoning/report agent ---
 llm_reasoning = AzureChatOpenAI(
-    azure_deployment=os.getenv("AZURE_OPENAI_REASONING_DEPLOYMENT"),
-    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    azure_deployment=AZURE_OPENAI_REASONING_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY,
+    timeout=60.0
 )
 
 # fallback supervisor prompt (use MCP stored prompt in build_agents when possible)
@@ -124,28 +151,55 @@ async def run_predictor(state: AgentState, predictor):
     query = state["last_query"]
     logger.info(f"[Predictor] Processing query: {query}")
 
-    # Initialize messages list if not exists
-    state.setdefault("messages", [])
-    
-    # Add user query to conversation history
-    state["messages"].append(HumanMessage(content=query))
-    
-    # Invoke predictor agent with complete message history
-    result = await predictor.ainvoke({"messages": state["messages"]})
-    answer = extract_answer(result)
-    logger.info(f"[Predictor] Raw result: {result}")
+    try:
+        state.setdefault("messages", [])
+        
+        # DEBUG CRÍTICO: ¿Qué mensajes hay realmente?
+        logger.info(f"[Predictor] DEBUG - Messages received:")
+        for i, msg in enumerate(state["messages"]):
+            logger.info(f"[Predictor] Message {i}: {type(msg).__name__} - '{msg.content}'")
+        
+        # Add user query to conversation history (por si acaso)
+        # state["messages"].append(HumanMessage(content=query))
 
-    # Add agent response to conversation history
-    state["messages"].append(AIMessage(content=answer))
-    
-    # Store raw output for other agents
-    state["last_agent_output"] = result
-    
-    return {
-        "result": answer,
-        "last_agent_output": result,
-        "messages": state["messages"]
-    }
+        logger.info(f"[Predictor] About to invoke with {len(state['messages'])} messages")
+        
+        # DEBUG: ¿Qué le estamos pasando EXACTAMENTE al predictor?
+        logger.info(f"[Predictor] Input to predictor: {[{'role': 'user', 'content': msg.content} if hasattr(msg, 'content') else str(msg) for msg in state['messages']]}")
+        
+        # Invoke predictor agent with complete message history
+        result = await predictor.ainvoke({"messages": state["messages"]})
+        answer = extract_answer(result)
+        logger.info(f"[Predictor] Successfully got result: {answer[:100]}...")
+
+        # Add agent response to conversation history
+        state["messages"].append(AIMessage(content=answer))
+        
+        # Store raw output for other agents
+        state["last_agent_output"] = result
+        
+        return {
+            "result": answer,
+            "last_agent_output": result,
+            "messages": state["messages"]
+        }
+    except asyncio.TimeoutError:
+        logger.error("[Predictor] Timeout waiting for Azure OpenAI")
+        # DEBUG: ¿Qué estaba pasando durante el timeout?
+        logger.error(f"[Predictor] State during timeout: {state}")
+        raise
+    except Exception as e:
+        logger.exception(f"[Predictor] Error: {e}")
+        logger.error(f"[Predictor] State during error: {state}")
+        # Fallback: respuesta simple en caso de error
+        fallback_msg = "I encountered an issue while processing your request. Please try again or ask a different question."
+        state["messages"].append(AIMessage(content=fallback_msg))
+        return {
+            "result": fallback_msg,
+            "last_agent_output": {"error": str(e)},
+            "messages": state["messages"]
+        }
+        raise
 
 async def run_rag(state: AgentState, rag):
     query = state["last_query"]
@@ -372,6 +426,11 @@ async def get_workflow():
         # Dispatcher: executes the requested agents in sequence and consolidates outputs
         async def dispatch_node(s: AgentState):
             logger.info("[Dispatch] Running requested agents...")
+            logger.info("[Dispatch] DEBUG - Full state received:")
+            logger.info(f"Messages: {len(s.get('messages', []))}")
+            logger.info(f"Last query: '{s.get('last_query', 'None')}'")
+            logger.info(f"Agents to call: {s.get('agents_to_call', [])}")
+
             agents = s.get("agents_to_call") or []
             collected: Dict[str, object] = {}
             s.setdefault("messages", [])
