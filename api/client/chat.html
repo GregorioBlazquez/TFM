@@ -1,37 +1,61 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>TFM Multi-Agent Chat</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: scroll; }
-        .user { color: blue; margin: 5px 0; }
-        .bot { color: green; margin: 5px 0; }
-        #input-container { margin-top: 10px; }
-    </style>
-</head>
 <body>
-    <h1>TFM Multi-Agent Chat</h1>
-    <div id="chat"></div>
 
-    <div id="input-container">
-        <input type="text" id="question" placeholder="Type your question" style="width: 70%;">
-        <button onclick="sendQuestion()">Send</button>
+    <h1>TFM Multi-Agent Chat</h1>
+
+    <!-- Login screen -->
+    <div id="login-container">
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <div id="login-error" style="color:red;"></div>
     </div>
 
+    <!-- Chat screen (hidden until login) -->
+    <div id="chat-container" style="display:none;">
+        <div id="chat"></div>
+        <div id="input-container">
+            <input type="text" id="question" placeholder="Type your question" style="width: 70%;">
+            <button onclick="sendQuestion()">Send</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        let sessionId = null;
         const chatDiv = document.getElementById('chat');
 
-    const userId = 'demo_user';  // For basic multi-user, later replace with login
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!res.ok) {
+                    document.getElementById('login-error').textContent = "Invalid credentials";
+                    return;
+                }
+
+                const data = await res.json();
+                sessionId = data.session_id;
+
+                // Hide login and show chat
+                document.getElementById('login-container').style.display = "none";
+                document.getElementById('chat-container').style.display = "block";
+            } catch (err) {
+                document.getElementById('login-error').textContent = "Error: " + err;
+            }
+        }
 
         async function sendQuestion() {
             const questionInput = document.getElementById('question');
             const question = questionInput.value.trim();
-            if (!question) return;
+            if (!question || !sessionId) return;
 
-
-            // Show user message
+            // Muestra el mensaje del usuario
             const userMsg = document.createElement('div');
             userMsg.className = 'user';
             userMsg.textContent = `You: ${question}`;
@@ -43,31 +67,31 @@
             try {
                 const response = await fetch('/ask', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: question, user_id: userId })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-ID': sessionId
+                    },
+                    body: JSON.stringify({ query: question })
                 });
+
                 const data = await response.json();
 
-
-                // Show bot response
                 const botMsg = document.createElement('div');
                 botMsg.className = 'bot';
-                botMsg.textContent = `Bot: ${data.answer}`;
+                botMsg.innerHTML = marked.parse(data.result || '[No response]');
                 chatDiv.appendChild(botMsg);
                 chatDiv.scrollTop = chatDiv.scrollHeight;
-
-            } catch (error) {
+            } catch (err) {
                 const errMsg = document.createElement('div');
                 errMsg.className = 'bot';
-                errMsg.textContent = `Error: ${error}`;
+                errMsg.textContent = `Error: ${err}`;
                 chatDiv.appendChild(errMsg);
             }
         }
 
-        // Allow sending with Enter
+        // Send with Enter
         document.getElementById('question').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') sendQuestion();
         });
     </script>
 </body>
-</html>
