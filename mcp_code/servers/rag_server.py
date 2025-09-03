@@ -69,9 +69,9 @@ def extract_pdf_text(path: Path) -> str:
 
 # ---------------- Chunking ----------------
 
-def process_destination(text: str) -> List[str]:
+def process_full_markdown(text: str) -> List[str]:
     """
-    Destination documents: keep entire text as a single chunk.
+    Not long markdown documents: keep entire text as a single chunk.
     """
     return [text.strip()]
 
@@ -140,6 +140,19 @@ def _build_index_from_scratch():
             "month": None,
             "source_url": None
         })
+    
+    # --- EDA and Clusters ---
+    eda = DOCS_DIR / "EDA.md"
+    if eda.exists():
+        docs.append({
+            "uri": "docs://eda",
+            "text": eda.read_text(encoding="utf-8"),
+            "type": "markdown",
+            "title": "EDA",
+            "year": None,
+            "month": None,
+            "source_url": None
+        })
 
     # --- Destinations ---
     dests = DOCS_DIR / "destinations"
@@ -176,8 +189,8 @@ def _build_index_from_scratch():
     for doc in docs:
         if not doc["text"].strip():
             continue
-        if doc["type"] == "destination":
-            chunks = process_destination(doc["text"])
+        if doc["type"] in ("destination", "markdown"):
+            chunks = process_full_markdown(doc["text"])
         elif doc["type"] == "faq":
             chunks = process_faqs(doc["text"])
         else:
@@ -249,7 +262,8 @@ async def rag_search(query: str, k: int = 3, ctx: Context | None = None) -> Dict
                 "year": d.get("year"),
                 "month": d.get("month"),
                 "source_url": d.get("source_url"),
-                "snippet": d["text"][:600]  # show more context
+                "snippet": d["text"][:100],
+                "content": d["text"]
             })
     return {"query": query, "results": results}
 
@@ -395,6 +409,73 @@ def historical_by_region(region: str) -> dict:
             r: float(v) for r, v in zip(group["region"], group["tourists"])
         }
     return output
+
+# --- Clusters Resource ---
+@rag_mcp.resource(
+    uri="clusters://profiles",
+    name="TouristClusters",
+    description="Return descriptive profiles of the 4 tourist clusters identified in the EGATUR analysis.",
+    mime_type="application/json",
+    tags={"tourism", "clusters", "segmentation"}
+)
+def cluster_profiles() -> dict:
+    return {
+        "Cluster 0": {
+            "label": "Long-stay visitors in Valencian Community",
+            "trip_pattern": "Longer trips, lower-to-medium daily expenditure",
+            "accommodation": "Mostly non-market",
+            "purpose": "Leisure and personal/other",
+            "regions": ["Valencian Community"]
+        },
+        "Cluster 1": {
+            "label": "Standard tourists (Island vacationers)",
+            "trip_pattern": "Typical summer leisure trips",
+            "accommodation": "Mostly hotels",
+            "purpose": "Leisure",
+            "regions": ["Balearic Islands", "Canary Islands"]
+        },
+        "Cluster 2": {
+            "label": "Personal/family visits",
+            "trip_pattern": "Long stays, spread across regions",
+            "accommodation": "Mostly non-market",
+            "purpose": "Visiting friends/family",
+            "regions": ["Multiple regions", "Winter bias"]
+        },
+        "Cluster 3": {
+            "label": "Urban, high-spending international tourists",
+            "trip_pattern": "Shorter trips, high daily expenditure",
+            "accommodation": "Almost exclusively hotels",
+            "purpose": "Leisure + business",
+            "regions": ["Catalonia", "Madrid"],
+            "notable_markets": ["Russia + Rest of the world"]
+        }
+    }
+
+# --- EDA Resource ---
+@rag_mcp.resource(
+    uri="eda://summary",
+    name="EDAFindings",
+    description="Summary of exploratory data analysis (EDA) on EGATUR tourist dataset.",
+    mime_type="application/json",
+    tags={"tourism", "eda", "analysis"}
+)
+def eda_summary() -> dict:
+    return {
+        "univariate": {
+            "numerical": "Right skew, big outliers in expenditure and trip length",
+            "categorical": "Trips concentrated in Catalonia, Balearic Islands, Andalusia, Canary Islands, Valencian Community, Madrid"
+        },
+        "bivariate": {
+            "expenditure_vs_length": "Negative correlation: longer trips → lower daily spending",
+            "outliers": "High spenders vary by metric (total vs daily vs weighted)"
+        },
+        "temporal": "Some seasonality, but not the main driver",
+        "conclusions": [
+            "High dispersion in data makes modeling difficult",
+            "Outliers differ by metric",
+            "Clusters provide more stability for segmentation"
+        ]
+    }
 
 
 # ---------- Init ----------

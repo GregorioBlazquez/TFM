@@ -334,40 +334,39 @@ async def supervisor_node(state: AgentState):
 async def prepare_reports_node(s: AgentState):
     return await prepare_for_reports(s)
 
-# Dispatcher: executes the requested agents in sequence and consolidates outputs
+# Dispatcher: executes the requested agents in parallel and consolidates outputs
 # This node runs the agents requested by the supervisor (predictor/rag), collects their outputs,
 # and prepares the state for the report agent. It always routes to prepare_reports.
+import asyncio
+
 async def dispatch_node(s: AgentState, predictor, rag):
-    logger.info("[Dispatch] Running requested agents...")
+    logger.info("[Dispatch] Running requested agents (parallel)...")
     agents = s.get("agents_to_call") or []
     collected: Dict[str, object] = {}
     s.setdefault("messages", [])
 
+    tasks = {}
+    if "predictor" in agents:
+        tasks["predictor"] = asyncio.create_task(run_predictor(s, predictor))
+    if "rag" in agents:
+        tasks["rag"] = asyncio.create_task(run_rag(s, rag))
+
+    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+
     last_result = None
-    for ag in agents:
-        if ag == "predictor":
-            out = await run_predictor(s, predictor)
-        elif ag == "rag":
-            out = await run_rag(s, rag)
-        else:
-            logger.warning(f"[Dispatch] Unknown agent requested: {ag}")
+    for agent_name, result in zip(tasks.keys(), results):
+        if isinstance(result, Exception):
+            logger.error(f"[Dispatch] Error running {agent_name}: {result}", exc_info=True)
             continue
+        collected[agent_name] = result.get("last_agent_output") or result.get("result")
+        if result.get("result"):
+            last_result = result["result"]
 
-        # out is a dict with keys result,last_agent_output,messages
-        collected[ag] = out.get("last_agent_output") or out.get("result")
-        last_result = out.get("result") or last_result
-
-    # Persist collected outputs for use by the report agent
+    # Persist collected outputs
     s["collected_outputs"] = collected
     s["last_agent_output"] = collected
-
-    # Clear agents_to_call so it doesn't leak into next turn
     s["agents_to_call"] = None
-
-    # Always send to reports (even if only predictor or rag was used)
     s["next_node"] = "prepare_reports"
-
-    # Keep raw result in state (reports agent will reformat)
     if last_result:
         s["result"] = last_result
 

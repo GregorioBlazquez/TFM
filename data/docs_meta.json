@@ -72,6 +72,15 @@
     "source_url": null
   },
   {
+    "uri": "docs://eda#chunk0",
+    "text": "# EGATUR EDA & Clustering Summary\n\n## Exploratory Data Analysis (EDA)\n\n- **Numerical variables:** Right skew, big outliers in expenditure and trip length.  \n- **Categorical variables:** Trips concentrated in Catalonia, Balearic Islands, Andalusia, Canary Islands, Valencian Community, Madrid.  \n- **Bivariate findings:**  \n  - High spenders differ by metric (total vs daily vs weighted).  \n  - Negative correlation between trip length and daily expenditure.  \n- **Temporal:** Some seasonality but not dominant.  \n\n## Clustering (K-means, 4 groups)\n\n1. **Cluster 0 – Long-stay visitors (Valencian Community)**  \n   - Longer trips, medium/low daily expenditure  \n   - Non-market accommodation  \n   - Leisure + personal purposes  \n\n2. **Cluster 1 – Standard tourists (Island vacationers)**  \n   - Balearic & Canary Islands  \n   - Mostly hotels, leisure trips  \n   - Strong summer seasonality  \n\n3. **Cluster 2 – Personal/family visits**  \n   - Long stays, non-market accommodation  \n   - Purpose “Other” (friends/family)  \n   - Spread across regions, more winter trips  \n\n4. **Cluster 3 – Urban, high-spending tourists**  \n   - Short trips, high daily expenditure  \n   - Hotels, Catalonia & Madrid  \n   - Mix leisure/business, strong presence of Russia + Rest of the world  \n\n## Key Insights\n\n- High dispersion & outliers → predictive modeling is challenging.  \n- Clusters are useful for segmentation and as features.",
+    "type": "markdown",
+    "title": "EDA",
+    "year": null,
+    "month": null,
+    "source_url": null
+  },
+  {
     "uri": "docs://destinations/andalucia#chunk0",
     "text": "# Andalucía\n\nAndalucía is one of the top tourist regions in Spain, famous for cultural heritage, beaches, and gastronomy.\n\n- Top destinations: Sevilla, Málaga, Granada, Córdoba.\n- Main source markets: UK, Germany, France.\n- High season: Summer (June–August) and Easter.",
     "type": "destination",
