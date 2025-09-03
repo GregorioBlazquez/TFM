@@ -34,9 +34,8 @@ def agent_prompt():
     - Do NOT call external tools
     - Only reason and explain with the provided context
 
-    Example:
-    "The expenditure is high because this tourist belongs to Cluster 3 
-    (international, hotels, urban destinations) where average spending is 40% 
-    above the national mean. The summer season adds a 15% premium according 
-    to EGATUR reports."
+    ## Example Output
+    > The expenditure is high because this tourist belongs to **Cluster 3**  
+    > (international, hotels, urban destinations) where average spending is **40% above the national mean**.  
+    > The summer season adds a **15% premium** according to *EGATUR reports*.  
     """, role="assistant")
