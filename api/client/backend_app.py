@@ -48,7 +48,8 @@ load_environment()
 required_vars = [
     "AZURE_OPENAI_API_KEY",
     "AZURE_OPENAI_ENDPOINT", 
-    "AZURE_OPENAI_DEPLOYMENT",
+    "AZURE_OPENAI_PREDICTOR_DEPLOYMENT",
+    "AZURE_OPENAI_RAG_DEPLOYMENT",
     "AZURE_OPENAI_ROUTER_DEPLOYMENT",
     "AZURE_OPENAI_REASONING_DEPLOYMENT",
     "MCP_BASE"
@@ -65,7 +66,8 @@ MCP_BASE = get_env_var("MCP_BASE", "http://127.0.0.1:8080/mcp/")
 AZURE_OPENAI_API_KEY = get_env_var("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_ENDPOINT = get_env_var("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_VERSION = get_env_var("AZURE_OPENAI_API_VERSION")
-AZURE_OPENAI_DEPLOYMENT = get_env_var("AZURE_OPENAI_DEPLOYMENT")
+AZURE_OPENAI_PREDICTOR_DEPLOYMENT = get_env_var("AZURE_OPENAI_PREDICTOR_DEPLOYMENT")
+AZURE_OPENAI_RAG_DEPLOYMENT = get_env_var("AZURE_OPENAI_RAG_DEPLOYMENT")
 AZURE_OPENAI_ROUTER_DEPLOYMENT = get_env_var("AZURE_OPENAI_ROUTER_DEPLOYMENT")
 AZURE_OPENAI_REASONING_DEPLOYMENT = get_env_var("AZURE_OPENAI_REASONING_DEPLOYMENT")
 
@@ -85,13 +87,22 @@ llm_router = AzureChatOpenAI(
     azure_deployment=AZURE_OPENAI_ROUTER_DEPLOYMENT,
     openai_api_version=AZURE_OPENAI_API_VERSION,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_API_KEY
+    api_key=AZURE_OPENAI_API_KEY,
+    temperature=0
+    #max_tokens=200
 )
-llm_agents = AzureChatOpenAI(
-    azure_deployment=AZURE_OPENAI_DEPLOYMENT,
+llm_predictor = AzureChatOpenAI(
+    azure_deployment=AZURE_OPENAI_PREDICTOR_DEPLOYMENT,
     openai_api_version=AZURE_OPENAI_API_VERSION,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY
+)
+llm_rag = AzureChatOpenAI(
+    azure_deployment=AZURE_OPENAI_RAG_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY,
+    temperature=0
 )
 llm_reasoning = AzureChatOpenAI(
     azure_deployment=AZURE_OPENAI_REASONING_DEPLOYMENT,
@@ -124,9 +135,9 @@ async def build_agents(session):
     rag_tools = [t for t in tools if t.name.startswith("rag_")]
 
     # Create react agents with tools and prompts
-    predictor_agent = create_react_agent(llm_agents, api_tools,
+    predictor_agent = create_react_agent(llm_predictor, api_tools,
                                     prompt=predictor_prompt.messages[0].content.text if predictor_prompt and predictor_prompt.messages else "")
-    rag_agent = create_react_agent(llm_agents, rag_tools,
+    rag_agent = create_react_agent(llm_rag, rag_tools,
                                   prompt=rag_prompt.messages[0].content.text if rag_prompt and rag_prompt.messages else "")
     reports_agent = create_react_agent(llm_reasoning, [],
                                       prompt=report_prompt.messages[0].content.text if report_prompt and report_prompt.messages else "")
@@ -145,6 +156,7 @@ async def run_predictor(state: AgentState, predictor):
     state["messages"].append(HumanMessage(content=query))
     
     # Invoke predictor agent with complete message history
+    # result = await predictor.ainvoke({"messages": [HumanMessage(content=query)]}) # just last query
     result = await predictor.ainvoke({"messages": state["messages"]})
     answer = extract_answer(result)
     logger.info(f"[Predictor] Raw result: {result}")
@@ -172,6 +184,7 @@ async def run_rag(state: AgentState, rag):
     state["messages"].append(HumanMessage(content=query))
     
     # Invoke RAG agent with complete message history
+    # result = await rag.ainvoke({"messages": [HumanMessage(content=query)]}) # just last query
     result = await rag.ainvoke({"messages": state["messages"]})
     answer = extract_answer(result)
     logger.info(f"[RAG] Raw result: {result}")
@@ -342,6 +355,11 @@ import asyncio
 async def dispatch_node(s: AgentState, predictor, rag):
     logger.info("[Dispatch] Running requested agents (parallel)...")
     agents = s.get("agents_to_call") or []
+
+    # Always include rag unless the intent was "other"
+    if s.get("last_intent") != "other" and "rag" not in agents:
+        agents.append("rag")
+
     collected: Dict[str, object] = {}
     s.setdefault("messages", [])
 
@@ -424,7 +442,7 @@ backend_app = FastAPI(title="Multi-agent API")
 
 # Frontend HTML and static files
 backend_app.mount("/static", StaticFiles(directory=os.path.dirname(__file__)), name="static")
-logger.info("Static files mounted at /static/chat.html")
+logger.info("Static files mounted at http://localhost:8000/static/chat.html or http://localhost:8000/chat")
 
 @backend_app.get("/chat")
 async def root():
@@ -532,6 +550,27 @@ async def login(req: LoginRequest):
             result=""
         )
     return {"session_id": session_id}
+
+########## NEW CHAT ##########
+@backend_app.post("/new_chat")
+async def new_chat(x_session_id: str = Header(...)):
+    async with sessions_lock:
+        if x_session_id not in sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        sessions[x_session_id] = AgentState(
+            messages=[],
+            last_query="",
+            last_agent_output=None,
+            last_intent="",
+            report_agent_input=None,
+            agents_to_call=None,
+            collected_outputs=None,
+            next_node="",
+            result=""
+        )
+
+    logger.info(f"New chat for session_id='{x_session_id}'")
+    return {"status": "ok", "message": "Session reset"}
 
 
 # ########## ASK ENDPOINT (with session persistence) ##########

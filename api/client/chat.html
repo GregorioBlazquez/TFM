@@ -2,6 +2,9 @@
 
     <h1>TFM Multi-Agent Chat</h1>
 
+    <!-- Theme toggle -->
+    <button id="theme-toggle">Toggle Dark Mode</button>
+
     <!-- Login screen -->
     <div id="login-container">
         <input type="text" id="username" placeholder="Username">
@@ -12,7 +15,8 @@
 
     <!-- Chat screen (hidden until login) -->
     <div id="chat-container" style="display:none;">
-        <div id="chat"></div>
+        <button onclick="newChat()">New Chat</button>
+        <div id="chat" style="border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto;"></div>
         <div id="input-container">
             <input type="text" id="question" placeholder="Type your question" style="width: 70%;">
             <button onclick="sendQuestion()">Send</button>
@@ -23,6 +27,12 @@
     <script>
         let sessionId = null;
         const chatDiv = document.getElementById('chat');
+        const body = document.body;
+
+        // Theme toggle
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+        });
 
         async function login() {
             const username = document.getElementById('username').value.trim();
@@ -42,7 +52,6 @@
                 const data = await res.json();
                 sessionId = data.session_id;
 
-                // Hide login and show chat
                 document.getElementById('login-container').style.display = "none";
                 document.getElementById('chat-container').style.display = "block";
             } catch (err) {
@@ -55,7 +64,6 @@
             const question = questionInput.value.trim();
             if (!question || !sessionId) return;
 
-            // Muestra el mensaje del usuario
             const userMsg = document.createElement('div');
             userMsg.className = 'user';
             userMsg.textContent = `You: ${question}`;
@@ -89,9 +97,50 @@
             }
         }
 
-        // Send with Enter
+        async function newChat() {
+            if (!sessionId) return;
+
+            // Limpiar chat
+            chatDiv.innerHTML = '';
+
+            // Llamada al backend para reiniciar la sesión
+            try {
+                await fetch('/new_chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-ID': sessionId
+                    }
+                });
+            } catch (err) {
+                const errMsg = document.createElement('div');
+                errMsg.className = 'bot';
+                errMsg.textContent = `Error starting new chat: ${err}`;
+                chatDiv.appendChild(errMsg);
+            }
+        }
+
         document.getElementById('question').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') sendQuestion();
         });
     </script>
+
+    <style>
+        body.dark-mode {
+            background-color: #121212;
+            color: #eee;
+        }
+        body.dark-mode input, body.dark-mode button {
+            background-color: #333;
+            color: #eee;
+            border: 1px solid #555;
+        }
+        .user {
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .bot {
+            margin: 5px 0;
+        }
+    </style>
 </body>
