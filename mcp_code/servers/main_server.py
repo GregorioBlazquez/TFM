@@ -55,33 +55,34 @@ def supervisor_prompt():
 
     CLASSIFICATION RULES:
     1. "predictor":
-       - Use when the user asks for forecasts, predictions, future values, estimates of tourist arrivals or expenditure, or cluster assignment.
+       - Use when the user asks directly for forecasts, predictions, future values, estimates of tourist arrivals, expenditure, or cluster assignment.
        - Examples: "How many tourists will visit Spain in 2025?", "Predict the average expenditure", "Assign this profile to a cluster".
-       - → Always set agents = ["predictor","rag"] (predictor + rag together).
-         The rag agent will provide relevant context such as cluster descriptions, official definitions, or EDA summaries.
+       - → agents = ["predictor","rag"]
 
     2. "rag":
-       - Use when the user asks about official statistics, summaries, or definitions from EGATUR, FRONTUR, INE reports, PDFs, or FAQs.
-       - Includes questions about the project itself or its author.
+       - Use when the user asks about official statistics, summaries, definitions, or project documentation (EGATUR, FRONTUR, INE reports, PDFs, FAQs, project author).
        - Examples: "Summarize the EGATUR report", "What is FRONTUR?", "Who is the author of this project?", "Are the data official or generated?".
-       - → Always set agents = ["rag"].
+       - → agents = ["rag"]
 
     3. "reports":
-       - Use when the user requests a comprehensive analysis, report, explanation, recommendations, or benchmarking.
-       - These require both model outputs and document context.
-       - Examples: "Generate a report about tourism in Spain next year", "Explain the forecast compared to EGATUR", "Give me recommendations for regional tourism policy".
-       - → Always set agents = ["predictor","rag"].
+       - Use when the user requests a comprehensive analysis, explanation, recommendations, or benchmarking.
+       - Distinguish two cases:
+         * Predictive reports (contain terms like "predict", "forecast", "future", "estimate", "cluster", "expenditure") → agents = ["predictor","rag"]
+         * Descriptive reports (contain terms like "explain", "analysis", "recommendations", "insights", "compare", "why") without forecast/cluster/expenditure keywords → agents = ["rag"]
+
+       - Examples predictive: "Generate a report about tourism in Spain next year", "Explain the forecast compared to EGATUR", "Forecast and analyze expenditure".
+       - Examples descriptive: "Explain the EGATUR results for 2024", "Give me recommendations for Andalusia based on past trends", "Analyze tourist clusters".
 
     4. "other":
-       - Only use when the query is unrelated to tourism, official reports, forecasts, or project FAQs.
+       - Only when the query is unrelated to tourism, forecasts, reports, or project documentation.
        - Examples: "Tell me a joke", "What is the capital of France?".
-       - → Always set agents = [].
+       - → agents = []
 
     PRIORITY RULES:
-    - If the query mentions "predict", "forecast", "expenditure", "cluster", or "how many tourists" → intent = "predictor", agents = ["predictor","rag"].
-    - If the query mentions EGATUR, FRONTUR, INE, or FAQs → intent = "rag" (unless explicitly a "report", then "reports").
-    - If the query mentions "report", "analysis", "recommendations", "explain" → intent = "reports".
-    - If unsure between predictor or rag → prefer including rag (agents should contain "rag").
+    - If query mentions "predict", "forecast", "future", "estimate", "cluster", or "expenditure" → treat as predictor or predictive report (agents must include "predictor").
+    - If query mentions EGATUR, FRONTUR, INE, FAQs → treat as rag (unless explicitly predictive, then reports).
+    - If query mentions "report", "analysis", "recommendations", "explain", "insights" → treat as reports (decide predictive vs descriptive).
+    - If unsure → include "rag".
 
     STRICT OUTPUT FORMAT:
     Respond ONLY with one JSON object.
@@ -91,8 +92,10 @@ def supervisor_prompt():
     {"intent":"predictor","agents":["predictor","rag"]}
     {"intent":"rag","agents":["rag"]}
     {"intent":"reports","agents":["predictor","rag"]}
+    {"intent":"reports","agents":["rag"]}
     {"intent":"other","agents":[]}
     """, role="assistant")
+
 
 @main_mcp.prompt
 def predictor_prompt():

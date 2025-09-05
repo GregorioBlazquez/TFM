@@ -13,6 +13,20 @@ ARIMA_MODELS_DIR = os.path.join(os.path.dirname(__file__), "../../models/arima")
 CLUSTER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/cluster/cluster_classifier_eda_nn.joblib")
 EXPENDITURE_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/daily_avg_exp/expenditure_model.pkl")
 
+# --- Preload models at import time ---
+# Load all ARIMA models into a dict {region: model_data}
+ARIMA_MODELS = {}
+for filename in os.listdir(ARIMA_MODELS_DIR):
+    if filename.endswith(".pkl"):
+        region = filename.replace("arima_model_", "").replace(".pkl", "")
+        ARIMA_MODELS[region] = joblib.load(os.path.join(ARIMA_MODELS_DIR, filename))
+
+# Load cluster model once
+CLUSTER_MODEL = joblib.load(CLUSTER_MODEL_PATH)
+
+# Load expenditure model once
+EXPENDITURE_MODEL = joblib.load(EXPENDITURE_MODEL_PATH)
+
 # --- Helpers ---
 def parse_period(period_str: str) -> datetime:
     try:
@@ -27,16 +41,10 @@ def log_transform(x):
 
 # --- Tourist prediction (ARIMA) ---
 def predict_tourists(region: str, period: str):
-    if region not in VALID_REGIONS:
-        raise ValueError(f"Region '{region}' not recognized. Valid: {VALID_REGIONS}")
+    if region not in ARIMA_MODELS:
+        raise ValueError(f"Region '{region}' not recognized. Valid: {list(ARIMA_MODELS.keys())}")
 
-    model_filename = f"arima_model_{region}.pkl"
-    model_path = os.path.join(ARIMA_MODELS_DIR, model_filename)
-
-    if not os.path.exists(model_path):
-        raise ValueError(f"Model file not found for region '{region}'.")
-
-    model_data = joblib.load(model_path)
+    model_data = ARIMA_MODELS[region]
     model = model_data["model"]
     last_period = model_data["last_period"]
 
@@ -45,7 +53,6 @@ def predict_tourists(region: str, period: str):
         raise ValueError(f"Target date {target_date.date()} must be after last trained date {last_period.date()}.")
 
     steps_ahead = (target_date.year - last_period.year) * 12 + (target_date.month - last_period.month)
-
     forecast, conf_int = model.predict(n_periods=steps_ahead, return_conf_int=True)
 
     pred_value = int(forecast[-1])
@@ -85,25 +92,21 @@ def get_historical_tourists(region: Optional[str] = None, period: Optional[str] 
 
 # --- Tourist clustering ---
 def predict_cluster(features: Dict) -> int:
-    nn_pipeline = joblib.load(CLUSTER_MODEL_PATH)
-
     X = pd.DataFrame([features])
-    cluster = int(nn_pipeline.predict(X)[0])
+    cluster = int(CLUSTER_MODEL.predict(X)[0])
     return cluster
 
 
 # --- Expenditure regression with SHAP ---
 def predict_expenditure(features: Dict) -> Tuple[float, List[Dict[str, float]]]:
-    model_data = joblib.load(EXPENDITURE_MODEL_PATH)
-    regressor = model_data["model"]
-    preproc = model_data["preprocessor"]
-    explainer = model_data["explainer"]
+    regressor = EXPENDITURE_MODEL["model"]
+    preproc = EXPENDITURE_MODEL["preprocessor"]
+    explainer = EXPENDITURE_MODEL["explainer"]
 
     X = pd.DataFrame([features])
     X_trans = preproc.transform(X)
 
     pred = float(regressor.predict(X_trans)[0])
-
     shap_values = explainer(X_trans)
     feature_names = preproc.get_feature_names_out()
     shap_list = [
