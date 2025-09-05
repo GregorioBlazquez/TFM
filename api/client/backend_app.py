@@ -85,6 +85,7 @@ log(None, f"Loaded Azure deployments: predictor={AZURE_OPENAI_PREDICTOR_DEPLOYME
 ########## LLMs and conversation state ##########
 class AgentState(TypedDict):
     messages: List[BaseMessage]
+    context_summary: Optional[str]
     last_query: str
     last_agent_output: Optional[dict]
     last_intent: str
@@ -166,19 +167,20 @@ async def run_predictor(state: AgentState, predictor):
     query = state["last_query"]
     log(state.get("session_id"), f"[Predictor] Processing query: {query}", level=logging.INFO)
 
-    # Initialize messages list if not exists
-    state.setdefault("messages", [])
+    # Build input messages with summary + current user query
+    messages = []
+    if state.get("context_summary"):
+        messages.append({"role": "system", "content": f"Conversation summary:\n{state['context_summary']}"})
+    messages.append(HumanMessage(content=query))
     
-    # Add user query to conversation history
-    state["messages"].append(HumanMessage(content=query))
-    
-    # Invoke predictor agent with complete message history
-    # result = await predictor.ainvoke({"messages": [HumanMessage(content=query)]}) # just last query
+    # Invoke predictor agent
     log(state.get("session_id"), f"[Predictor] messages before call: {[safe_log_message(str(m.content), 100) for m in state['messages']]}", level=logging.DEBUG)
-    result = await predictor.ainvoke({"messages": state["messages"]})
+    result = await predictor.ainvoke({"messages": messages})
     answer = extract_answer(result)
     log(state.get("session_id"), f"[Predictor] Raw result: {safe_log_message(str(result))}", level=logging.INFO)
 
+    # Add user query to conversation history
+    state["messages"].append(HumanMessage(content=query))
     # Add agent response to conversation history
     state["messages"].append(AIMessage(content=answer))
     
@@ -195,19 +197,20 @@ async def run_rag(state: AgentState, rag):
     query = state["last_query"]
     log(state.get("session_id"), f"[RAG] Processing query: {query}", level=logging.INFO)
 
-    # Initialize messages list if not exists
-    state.setdefault("messages", [])
+    # Build input messages with summary + current user query
+    messages = []
+    if state.get("context_summary"):
+        messages.append({"role": "system", "content": f"Conversation summary:\n{state['context_summary']}"})
+    messages.append(HumanMessage(content=query))
     
-    # Add user query to conversation history
-    state["messages"].append(HumanMessage(content=query))
-    
-    # Invoke RAG agent with complete message history
-    # result = await rag.ainvoke({"messages": [HumanMessage(content=query)]}) # just last query
+    # Invoke RAG agent
     log(state.get("session_id"), f"[RAG] messages before call: {[safe_log_message(str(m.content), 100) for m in state['messages']]}", level=logging.DEBUG)
-    result = await rag.ainvoke({"messages": state["messages"]})
+    result = await rag.ainvoke({"messages": messages})
     answer = extract_answer(result)
     log(state.get("session_id"), f"[RAG] Raw result: {safe_log_message(str(result))}", level=logging.INFO)
 
+    # Add user query to conversation history
+    state["messages"].append(HumanMessage(content=query))
     # Add agent response to conversation history
     state["messages"].append(AIMessage(content=answer))
     
@@ -463,6 +466,36 @@ def serialize_value(v: Any) -> Any:
     except Exception:
         return str(v)
 
+async def update_context_summary(state: AgentState, new_user_query: str, new_agent_answer: str):
+    """
+    Maintain a running summary of the conversation instead of keeping all assistant messages.
+    This summary should provide enough context for the predictor or rag agent.
+    """
+    previous_summary = state.get("context_summary", "")
+    system_prompt = f"""
+    You are a summarizer. Update the conversation summary given the last user query and assistant answer.
+
+    Previous summary:
+    {previous_summary}
+
+    New user query:
+    {new_user_query}
+
+    Assistant answer:
+    {new_agent_answer}
+
+    Provide an updated concise summary in English.
+    """
+
+    try:
+        summary_result = await llm_router.ainvoke([{"role": "system", "content": system_prompt}])
+        updated_summary = summary_result.content.strip()
+        state["context_summary"] = updated_summary
+    except Exception as e:
+        log(state.get("session_id"), f"[Summary] Failed to update summary: {e}", level=logging.ERROR)
+        # fallback: append raw text
+        state["context_summary"] = f"{previous_summary}\nUser: {new_user_query}\nAssistant: {new_agent_answer}"
+
 ########## FASTAPI APP ##########
 backend_app = FastAPI(title="Multi-agent API")
 
@@ -566,6 +599,7 @@ async def login(req: LoginRequest):
     async with sessions_lock:
         sessions[session_id] = AgentState(
             messages=[],
+            context_summary="",
             last_query="",
             last_agent_output=None,
             last_intent="",
@@ -586,6 +620,7 @@ async def new_chat(x_session_id: str = Header(...)):
             raise HTTPException(status_code=404, detail="Session not found")
         sessions[x_session_id] = AgentState(
             messages=[],
+            context_summary="",
             last_query="",
             last_agent_output=None,
             last_intent="",
@@ -619,6 +654,7 @@ async def ask(query: Query, x_session_id: str = Header(default=None)):
             log(session_id, f"[ASK] Creating new session for session_id={session_id}", level=logging.INFO)
             state = AgentState(
                 messages=[],
+                context_summary="",
                 last_query="",
                 last_agent_output=None,
                 last_intent="",
@@ -654,6 +690,15 @@ async def ask(query: Query, x_session_id: str = Header(default=None)):
     async with sessions_lock:
         sessions[session_id] = result_state
         log(session_id, f"[ASK] Updated session state for session_id={session_id}", level=logging.INFO)
+
+    # Update summary in background (fire-and-forget)
+    asyncio.create_task(
+        update_context_summary(
+            result_state, 
+            state["last_query"], 
+            result_state.get("result", "")
+        )
+    )
 
     # Serialize before returning
     serialized = {k: serialize_value(v) for k, v in result_state.items()}
