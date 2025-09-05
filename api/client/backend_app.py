@@ -77,6 +77,7 @@ AZURE_OPENAI_API_VERSION = get_env_var("AZURE_OPENAI_API_VERSION")
 AZURE_OPENAI_PREDICTOR_DEPLOYMENT = get_env_var("AZURE_OPENAI_PREDICTOR_DEPLOYMENT")
 AZURE_OPENAI_RAG_DEPLOYMENT = get_env_var("AZURE_OPENAI_RAG_DEPLOYMENT")
 AZURE_OPENAI_ROUTER_DEPLOYMENT = get_env_var("AZURE_OPENAI_ROUTER_DEPLOYMENT")
+AZURE_OPENAI_SUMMARY_DEPLOYMENT = get_env_var("AZURE_OPENAI_SUMMARY_DEPLOYMENT")
 AZURE_OPENAI_REASONING_DEPLOYMENT = get_env_var("AZURE_OPENAI_REASONING_DEPLOYMENT")
 
 log(None, f"Loaded env var MCP_BASE={MCP_BASE}", level=logging.DEBUG)
@@ -97,6 +98,14 @@ class AgentState(TypedDict):
 
 llm_router = AzureChatOpenAI(
     azure_deployment=AZURE_OPENAI_ROUTER_DEPLOYMENT,
+    openai_api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY,
+    temperature=0
+    #max_tokens=200
+)
+llm_summary = AzureChatOpenAI(
+    azure_deployment=AZURE_OPENAI_SUMMARY_DEPLOYMENT,
     openai_api_version=AZURE_OPENAI_API_VERSION,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
@@ -488,9 +497,10 @@ async def update_context_summary(state: AgentState, new_user_query: str, new_age
     """
 
     try:
-        summary_result = await llm_router.ainvoke([{"role": "system", "content": system_prompt}])
+        summary_result = await llm_summary.ainvoke([{"role": "system", "content": system_prompt}])
         updated_summary = summary_result.content.strip()
         state["context_summary"] = updated_summary
+        log(state.get("session_id"), f"[Summary] Updated summary: {safe_log_message(updated_summary)}", level=logging.INFO)
     except Exception as e:
         log(state.get("session_id"), f"[Summary] Failed to update summary: {e}", level=logging.ERROR)
         # fallback: append raw text
