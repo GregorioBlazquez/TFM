@@ -7,6 +7,9 @@ from pypdf import PdfReader
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+import logging
+logger = logging.getLogger(__name__)
 from fastmcp import FastMCP, Context
 from fastmcp.prompts.prompt import Message
 import pandas as pd
@@ -43,6 +46,7 @@ def _save_index():
     faiss.write_index(index, str(INDEX_PATH))
     with open(DOCS_PATH, "w", encoding="utf-8") as f:
         json.dump(_DOCS, f, ensure_ascii=False, indent=2)
+    logger.info(f"Saved FAISS index and docs metadata. Total docs: {len(_DOCS)}")
 
 def _load_index():
     global index, _DOCS
@@ -50,8 +54,9 @@ def _load_index():
         index = faiss.read_index(str(INDEX_PATH))
         with open(DOCS_PATH, "r", encoding="utf-8") as f:
             _DOCS = json.load(f)
-        print(f"✅ Loaded FAISS index with {len(_DOCS)} docs")
+        logger.info(f"✅ Loaded FAISS index with {len(_DOCS)} docs")
         return True
+    logger.warning("No existing FAISS index or docs metadata found.")
     return False
 
 # ---------------- Text Extraction ----------------
@@ -131,6 +136,7 @@ def _build_index_from_scratch():
     # --- FAQs ---
     faqs = DOCS_DIR / "faqs.md"
     if faqs.exists():
+        logger.debug("Adding FAQs document to index.")
         docs.append({
             "uri": "docs://faqs",
             "text": faqs.read_text(encoding="utf-8"),
@@ -144,6 +150,7 @@ def _build_index_from_scratch():
     # --- EDA and Clusters ---
     eda = DOCS_DIR / "EDA.md"
     if eda.exists():
+        logger.debug("Adding EDA document to index.")
         docs.append({
             "uri": "docs://eda",
             "text": eda.read_text(encoding="utf-8"),
@@ -158,6 +165,7 @@ def _build_index_from_scratch():
     dests = DOCS_DIR / "destinations"
     if dests.exists():
         for f in dests.glob("*.md"):
+            logger.debug(f"Adding destination document {f.stem} to index.")
             docs.append({
                 "uri": f"docs://destinations/{f.stem}",
                 "text": f.read_text(encoding="utf-8"),
@@ -173,6 +181,7 @@ def _build_index_from_scratch():
                             ("EGATUR0625.pdf", "EGATUR 2025-06")]:
         pdf_path = DOCS_DIR / pdf_name
         if pdf_path.exists():
+            logger.debug(f"Extracting and adding PDF {pdf_name} to index.")
             text = extract_pdf_text(pdf_path)
             meta = parse_pdf_metadata(pdf_name)
             docs.append({
@@ -209,7 +218,7 @@ def _build_index_from_scratch():
             })
 
     _save_index()
-    print(f"📚 Built new FAISS index with {len(_DOCS)} chunks")
+    logger.info(f"📚 Built new FAISS index with {len(_DOCS)} chunks")
 
 # ---------------- RAG Tools ----------------
 @rag_mcp.tool(tags={"rag"})
@@ -218,6 +227,7 @@ async def rag_upsert(uri: str, text: str, ctx: Context | None = None) -> str:
     Add a plain text document into the FAISS RAG index as a single chunk and persist it.
     """
     global index, _DOCS
+    logger.info(f"Upserting document: {uri}")
     if ctx:
         await ctx.info("rag_upsert:start", extra={"uri": uri})
 
@@ -235,6 +245,9 @@ async def rag_upsert(uri: str, text: str, ctx: Context | None = None) -> str:
             "source_url": None
         })
         _save_index()
+        logger.info(f"Upserted {uri} as a single chunk.")
+    else:
+        logger.warning(f"Attempted to upsert empty chunk for {uri}.")
 
     if ctx:
         await ctx.info("rag_upsert:done", extra={"uri": uri})
@@ -246,7 +259,9 @@ async def rag_search(query: str, k: int = 3, ctx: Context | None = None) -> Dict
     """
     Search top-k snippets from the FAISS RAG index.
     """
+    logger.info(f"RAG search called with query: {query}")
     if len(_DOCS) == 0:
+        logger.warning("RAG search attempted with empty document index.")
         return {"query": query, "results": []}
     qvec = _embed([query])
     scores, ids = index.search(qvec, k)
@@ -265,6 +280,7 @@ async def rag_search(query: str, k: int = 3, ctx: Context | None = None) -> Dict
                 "snippet": d["text"][:100],
                 "content": d["text"]
             })
+    logger.info(f"RAG search returned {len(results)} results.")
     return {"query": query, "results": results}
 
 # ---------------- Prompts ----------------
@@ -485,6 +501,6 @@ def eda_summary() -> dict:
 # ---------- Init ----------
 # if not _load_index():
 _build_index_from_scratch()
-print("⚠️ No existing index found, built from scratch.")
+logger.warning("⚠️ No existing index found, built from scratch.")
 #for i, doc in enumerate(_DOCS):
-#    print(i, doc["uri"], len(doc["text"]), doc["text"])
+#    logger.debug(f"{i} {doc['uri']} {len(doc['text'])} {doc['text']}")

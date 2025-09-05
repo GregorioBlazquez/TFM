@@ -24,15 +24,17 @@ MCP_HOST = get_env_var("MCP_HOST", "127.0.0.1")
 MCP_PORT = int(get_env_var("MCP_PORT", 8080))
 
 ########## LOGGING ##########
-# Initialize logging
+# Module-level logger
+logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=get_env_var("MCP_LOGGING_LEVEL", logging.DEBUG),
     format="%(asctime)s %(levelname)s %(name)s %(message)s"
 )
 
 ########## MCP SERVER ##########
 # Main MCP server
 main_mcp = FastMCP(name="main-mcp-server")
+logger.info("Initialized main MCP server.")
 
 # Log timing (tools/resources/prompts)
 #main_mcp.add_middleware(DetailedTimingMiddleware())
@@ -124,25 +126,34 @@ def predictor_prompt():
 
 ########## MCP SERVER ##########
 async def setup():
-    # Mount existing MCP sub-servers
-    main_mcp.mount(rag_mcp, prefix="rag")
-    main_mcp.mount(report_mcp, prefix="report")
+    try:
+        # Mount existing MCP sub-servers
+        logger.info("Mounting RAG MCP sub-server...")
+        main_mcp.mount(rag_mcp, prefix="rag")
+        logger.info("Mounting Report MCP sub-server...")
+        main_mcp.mount(report_mcp, prefix="report")
 
-    # Mount your FastAPI API as an MCP server
-    api_mcp = FastMCP.from_fastapi(fastapi_app, name="api-mcp")
-    main_mcp.mount(api_mcp, prefix="api")
+        # Mount FastAPI API as an MCP server (predictor)
+        logger.info("Mounting FastAPI API as MCP sub-server...")
+        api_mcp = FastMCP.from_fastapi(fastapi_app, name="api-mcp")
+        main_mcp.mount(api_mcp, prefix="api")
+        logger.info("All sub-servers mounted successfully.")
+    except Exception as e:
+        logger.exception(f"Error during server setup: {e}")
+        raise
 
 if __name__ == "__main__":
     asyncio.run(setup())
-    print(f"🚀 Main MCP server running on http://{MCP_HOST}:{MCP_PORT}/mcp/")
+    logger.info(f"🚀 Main MCP server running on http://{MCP_HOST}:{MCP_PORT}/mcp/")
     main_mcp.run(
         transport="http",
         host=MCP_HOST,
         port=MCP_PORT,
-        log_level="DEBUG"
+        log_level=get_env_var("MCP_LOGGING_LEVEL", "DEBUG")
     )
 
 ########## HEALTH CHECK ##########
 @main_mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> PlainTextResponse:
+    logger.debug("Health check endpoint called.")
     return PlainTextResponse("OK")
