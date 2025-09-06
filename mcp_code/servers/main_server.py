@@ -5,9 +5,6 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from config import get_env_var
 from fastmcp import FastMCP
-from mcp_code.servers.rag_server import rag_mcp
-from mcp_code.servers.report_server import report_mcp
-from api.server.main import app as fastapi_app
 import logging
 from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
@@ -26,6 +23,10 @@ logging.basicConfig(
     level=get_env_var("MCP_LOGGING_LEVEL", logging.DEBUG),
     format="%(asctime)s %(levelname)s %(name)s %(message)s"
 )
+
+from mcp_code.servers.rag_server import rag_mcp
+from mcp_code.servers.report_server import report_mcp
+from api.server.main import app as fastapi_app
 
 ########## MCP SERVER ##########
 # Main MCP server
