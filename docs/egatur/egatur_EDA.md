@@ -5,6 +5,7 @@
 - **Country effects:** Tourists from Russia & Rest of the World spend significantly more per day.
 - **Outliers:** High spenders differ by metric (total, weighted, daily). Extreme trips are not consistent across measures.
 - **Clusters:** Segmentation shows clear differences in purpose, accommodation, and geography.
+- **SHAP base prediction:** The base prediction for SHAP values, which predicts nearly the mean expenditure, yields an average of €233.9 average daily expenditure.
 
 # EGATUR – Tourist Clusters (EDA)
 

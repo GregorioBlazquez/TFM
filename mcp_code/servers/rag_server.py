@@ -7,9 +7,8 @@ from pypdf import PdfReader
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-import logging
-logger = logging.getLogger(__name__)
 from fastmcp import FastMCP, Context
 from fastmcp.prompts.prompt import Message
 import pandas as pd
@@ -18,6 +17,9 @@ from mcp.types import TextResourceContents
 from config import get_env_var
 
 rag_mcp = FastMCP(name="mcp-rag")
+
+import logging
+logger = logging.getLogger(__name__)
 
 # --- Paths ---
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -59,7 +61,7 @@ def _load_index():
     logger.warning("No existing FAISS index or docs metadata found.")
     return False
 
-# ---------------- Text Extraction ----------------
+# ---------------- PDF Text Extraction ----------------
 def extract_pdf_text(path: Path) -> str:
     """Extract clean text from PDF."""
     reader = PdfReader(str(path))
@@ -73,7 +75,6 @@ def extract_pdf_text(path: Path) -> str:
     return "\n".join(text)
 
 # ---------------- Chunking ----------------
-
 def process_full_markdown(text: str) -> List[str]:
     """
     Not long markdown documents: keep entire text as a single chunk.
@@ -96,25 +97,16 @@ def process_faqs(text: str) -> List[str]:
         chunks.append(sec)
     return chunks[1:]  # skip the first title split
 
-def process_pdf(text: str, min_len: int = 1000, max_len: int = 2000, overlap: int = 200) -> List[str]:
+def process_pdf(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
     """
-    PDFs: split by paragraphs into large chunks.
-    Combine paragraphs to get 1000–2000 chars per chunk.
+    PDFs: split by paragraphs into large chunks with some overlap
     """
-    paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
-    chunks = []
-    current = ""
-    for p in paragraphs:
-        if len(current) + len(p) + 1 <= max_len:
-            current += " " + p
-        else:
-            if current:
-                chunks.append(current.strip())
-                # start next chunk with overlap
-                current = current[-overlap:] + " " + p if overlap < len(current) else current + " " + p
-    if current.strip():
-        chunks.append(current.strip())
-    return chunks
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n", "\n", ".", " "]
+    )
+    return splitter.split_text(text)
 
 # ---------------- Metadata ----------------
 def parse_pdf_metadata(filename: str) -> Dict[str, Optional[int]]:
@@ -126,99 +118,119 @@ def parse_pdf_metadata(filename: str) -> Dict[str, Optional[int]]:
     return {"year": year, "month": month}
 
 # ---------------- Build Index ----------------
-def _build_index_from_scratch():
-    global index, _DOCS
-    index = faiss.IndexFlatIP(dimension)
-    _DOCS = []
-
+def _scan_docs() -> List[Dict]:
     docs = []
 
+    def add_doc(path: Path, uri: str, title: str, doc_type: str, year=None, month=None):
+        docs.append({
+            "uri": uri,
+            "path": str(path),
+            "text": None,   # se llenará después
+            "type": doc_type,
+            "title": title,
+            "year": year,
+            "month": month,
+            "source_url": None,
+            "mtime": path.stat().st_mtime
+        })
+
     # --- FAQs ---
-    faqs = DOCS_DIR / "faqs.md"
+    faqs = DOCS_DIR / "project_faqs.md"
     if faqs.exists():
-        logger.debug("Adding FAQs document to index.")
-        docs.append({
-            "uri": "docs://faqs",
-            "text": faqs.read_text(encoding="utf-8"),
-            "type": "faq",
-            "title": "FAQs",
-            "year": None,
-            "month": None,
-            "source_url": None
-        })
-    
-    # --- EDA and Clusters ---
-    eda = DOCS_DIR / "EDA.md"
-    if eda.exists():
-        logger.debug("Adding EDA document to index.")
-        docs.append({
-            "uri": "docs://eda",
-            "text": eda.read_text(encoding="utf-8"),
-            "type": "markdown",
-            "title": "EDA",
-            "year": None,
-            "month": None,
-            "source_url": None
-        })
+        add_doc(faqs, "docs://faqs", "Project FAQs", "faq")
+
+    # --- EGATUR ---
+    egatur_dir = DOCS_DIR / "egatur"
+    if egatur_dir.exists():
+        for f in egatur_dir.iterdir():
+            if f.suffix.lower() == ".md":
+                add_doc(f, f"docs://egatur/{f.stem}", f"EGATUR {f.stem}", "markdown")
+            elif f.suffix.lower() == ".pdf":
+                meta = parse_pdf_metadata(f.name)
+                title = f"EGATUR {meta['year']}-{meta['month']:02d}" if meta["year"] else f.name
+                add_doc(f, f"docs://egatur/{f.stem}", title, "pdf", meta["year"], meta["month"])
+
+    # --- FRONTUR ---
+    frontur_dir = DOCS_DIR / "frontur"
+    if frontur_dir.exists():
+        for f in frontur_dir.iterdir():
+            if f.suffix.lower() == ".md":
+                add_doc(f, f"docs://frontur/{f.stem}", f"FRONTUR {f.stem}", "markdown")
+            elif f.suffix.lower() == ".pdf":
+                meta = parse_pdf_metadata(f.name)
+                title = f"FRONTUR {meta['year']}-{meta['month']:02d}" if meta["year"] else f.name
+                add_doc(f, f"docs://frontur/{f.stem}", title, "pdf", meta["year"], meta["month"])
 
     # --- Destinations ---
     dests = DOCS_DIR / "destinations"
     if dests.exists():
         for f in dests.glob("*.md"):
-            logger.debug(f"Adding destination document {f.stem} to index.")
-            docs.append({
-                "uri": f"docs://destinations/{f.stem}",
-                "text": f.read_text(encoding="utf-8"),
-                "type": "destination",
-                "title": f.stem,
-                "year": None,
-                "month": None,
-                "source_url": None
-            })
+            add_doc(f, f"docs://destinations/{f.stem}", f"Destination {f.stem.title()}", "destination")
 
-    # --- PDFs ---
-    for pdf_name, title in [("FRONTUR0625.pdf", "FRONTUR 2025-06"),
-                            ("EGATUR0625.pdf", "EGATUR 2025-06")]:
-        pdf_path = DOCS_DIR / pdf_name
-        if pdf_path.exists():
-            logger.debug(f"Extracting and adding PDF {pdf_name} to index.")
-            text = extract_pdf_text(pdf_path)
-            meta = parse_pdf_metadata(pdf_name)
-            docs.append({
-                "uri": f"docs://{pdf_name.lower().replace('.pdf','')}",
-                "text": text,
-                "type": "pdf",
-                "title": title,
-                "year": meta["year"],
-                "month": meta["month"],
-                "source_url": None
-            })
+    return docs
 
-    # --- Encode and add to FAISS ---
-    for doc in docs:
-        if not doc["text"].strip():
-            continue
-        if doc["type"] in ("destination", "markdown"):
-            chunks = process_full_markdown(doc["text"])
-        elif doc["type"] == "faq":
-            chunks = process_faqs(doc["text"])
+
+def _build_or_update_index():
+    global index, _DOCS
+
+    # Cargar índice existente
+    fresh = True
+    if _load_index():
+        fresh = False
+
+    # Escanear docs actuales
+    scanned_docs = _scan_docs()
+
+    # Mapear los existentes por URI
+    existing = {doc["uri"]: doc for doc in _DOCS}
+
+    new_docs = []
+    unchanged = []
+    for doc in scanned_docs:
+        if doc["uri"] not in existing:
+            logger.info(f"🆕 New document: {doc['uri']}")
+            new_docs.append(doc)
         else:
-            chunks = process_pdf(doc["text"])
-        for i, chunk in enumerate(chunks):
-            vec = _embed([chunk])
-            index.add(vec)
-            _DOCS.append({
-                "uri": f"{doc['uri']}#chunk{i}",
-                "text": chunk,
-                "type": doc["type"],
-                "title": doc["title"],
-                "year": doc["year"],
-                "month": doc["month"],
-                "source_url": doc.get("source_url")
-            })
+            if abs(doc["mtime"] - existing[doc["uri"]].get("mtime", 0)) > 1:
+                logger.info(f"♻️ Updated document: {doc['uri']}")
+                new_docs.append(doc)
+            else:
+                unchanged.append(existing[doc["uri"]])
 
-    _save_index()
-    logger.info(f"📚 Built new FAISS index with {len(_DOCS)} chunks")
+    if fresh or new_docs:
+        logger.info(f"📚 Rebuilding index: {len(new_docs)} new/updated docs, {len(unchanged)} unchanged")
+
+        # Reiniciar FAISS si es rebuild completo
+        index = faiss.IndexFlatIP(dimension)
+        _DOCS = []
+
+        # Volver a indexar todo (unchanged + new_docs)
+        for doc in unchanged + new_docs:
+            path = Path(doc["path"])
+            if doc["type"] == "faq":
+                text = path.read_text(encoding="utf-8")
+                chunks = process_faqs(text)
+            elif doc["type"] in ("destination", "markdown"):
+                text = path.read_text(encoding="utf-8")
+                chunks = process_full_markdown(text)
+            elif doc["type"] == "pdf":
+                text = extract_pdf_text(path)
+                chunks = process_pdf(text)
+            else:
+                continue
+
+            for i, chunk in enumerate(chunks):
+                vec = _embed([chunk])
+                index.add(vec)
+                _DOCS.append({
+                    **doc,
+                    "uri": f"{doc['uri']}#chunk{i}",
+                    "text": chunk
+                })
+
+        _save_index()
+    else:
+        logger.info("✅ No document changes detected, using cached index.")
 
 # ---------------- RAG Tools ----------------
 @rag_mcp.tool(tags={"rag"})
@@ -499,8 +511,7 @@ def eda_summary() -> dict:
 
 
 # ---------- Init ----------
-# if not _load_index():
-_build_index_from_scratch()
-logger.warning("⚠️ No existing index found, built from scratch.")
-#for i, doc in enumerate(_DOCS):
-#    logger.debug(f"{i} {doc['uri']} {len(doc['text'])} {doc['text']}")
+logger.info("🔍 Starting to build or update document index...")
+_build_or_update_index()
+for i, doc in enumerate(_DOCS):
+    logger.debug(f"{i} {doc['uri']} {len(doc['text'])}")

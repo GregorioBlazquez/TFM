@@ -1,7 +1,7 @@
 # EGATUR – Predictive Models
 
 ## Cluster Classifier
-- Neural network trained to replicate EDA clusters.
+- Logistic regression trained to replicate EDA clusters.
 - Accuracy >99%.
 - Assigns new tourist profiles to one of 4 clusters.
 
