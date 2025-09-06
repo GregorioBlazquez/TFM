@@ -14,10 +14,6 @@ from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
 from fastmcp.prompts.prompt import Message
 from pathlib import Path
 
-import numpy as np
-def log_transform(x):
-    return np.log1p(x)
-
 ########## ENV VARS ##########
 # Load environment variables
 MCP_HOST = get_env_var("MCP_HOST", "127.0.0.1")

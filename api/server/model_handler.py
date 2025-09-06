@@ -35,10 +35,6 @@ def parse_period(period_str: str) -> datetime:
         year = int(period_str[:4])
         month = int(period_str[-2:])
         return datetime(year, month, 1)
-
-def log_transform(x):
-    return np.log1p(x)
-
 # --- Tourist prediction (ARIMA) ---
 def predict_tourists(region: str, period: str):
     if region not in ARIMA_MODELS:
