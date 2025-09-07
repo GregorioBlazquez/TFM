@@ -38,7 +38,8 @@ for noisy in (
     "faiss",                       # FAISS library
     "sentence_transformers",       # Sentence transformers
     "urllib3",                     # HTTP client library
-    "matplotlib"                   # Plotting library
+    "matplotlib",                   # Plotting library
+    "filelock"
 ):
     # Different logging level for noisy libraries
     logging.getLogger(noisy).setLevel(get_env_var("MCP_LOGGING_LEVEL_NOISY", logging.WARNING))
