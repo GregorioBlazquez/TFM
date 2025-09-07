@@ -19,16 +19,35 @@ MCP_PORT = int(get_env_var("MCP_PORT", 8080))
 ########## LOGGING ##########
 # Module-level logger
 logger = logging.getLogger(__name__)
+
+# Basic logging configuration
 logging.basicConfig(
     level=get_env_var("MCP_LOGGING_LEVEL", logging.DEBUG),
     format="%(asctime)s %(levelname)s %(name)s %(message)s"
 )
 
+# Quiet noisy libraries
+for noisy in (
+    "httpx",
+    "httpcore",
+    "mcp.client",                  # MCP client core
+    "mcp.client.streamable_http",  # SSE/stream client
+    "uvicorn.access",
+    "uvicorn.error",
+    "asyncio",
+    "faiss",                       # FAISS library
+    "sentence_transformers",       # Sentence transformers
+    "urllib3",                     # HTTP client library
+    "matplotlib"                   # Plotting library
+):
+    # Different logging level for noisy libraries
+    logging.getLogger(noisy).setLevel(get_env_var("MCP_LOGGING_LEVEL_NOISY", logging.WARNING))
+
+########## MCP SERVER ##########
 from mcp_code.servers.rag_server import rag_mcp
 from mcp_code.servers.report_server import report_mcp
 from api.server.main import app as fastapi_app
 
-########## MCP SERVER ##########
 # Main MCP server
 main_mcp = FastMCP(name="main-mcp-server")
 logger.info("Initialized main MCP server.")
@@ -142,6 +161,12 @@ async def setup():
         logger.exception(f"Error during server setup: {e}")
         raise
 
+########## HEALTH CHECK ##########
+@main_mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> PlainTextResponse:
+    logger.debug("Health check endpoint called.")
+    return PlainTextResponse("OK")
+
 if __name__ == "__main__":
     asyncio.run(setup())
     logger.info(f"🚀 Main MCP server running on http://{MCP_HOST}:{MCP_PORT}/mcp/")
@@ -151,9 +176,3 @@ if __name__ == "__main__":
         port=MCP_PORT,
         log_level=get_env_var("MCP_LOGGING_LEVEL", "DEBUG")
     )
-
-########## HEALTH CHECK ##########
-@main_mcp.custom_route("/health", methods=["GET"])
-async def health_check(request: Request) -> PlainTextResponse:
-    logger.debug("Health check endpoint called.")
-    return PlainTextResponse("OK")
