@@ -88,6 +88,17 @@ def get_historical_tourists(region: Optional[str] = None, period: Optional[str] 
 
 # --- Tourist clustering ---
 def predict_cluster(features: Dict) -> int:
+    features = features.copy()
+
+    # Check if daily_average_expenditure is present
+    dae = features.get("daily_average_expenditure", None)
+
+    # If not predict
+    if dae is None or (isinstance(dae, float) and pd.isna(dae)):
+        features_for_pred = {k: v for k, v in features.items() if k != "daily_average_expenditure"}
+        pred_exp, _ = predict_expenditure(features_for_pred)
+        features["daily_average_expenditure"] = float(pred_exp)
+
     X = pd.DataFrame([features])
     cluster = int(CLUSTER_MODEL.predict(X)[0])
     return cluster
