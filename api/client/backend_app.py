@@ -594,7 +594,11 @@ async def startup_event():
     log(None, "Startup complete", level=logging.INFO)
 
 ########## LOGIN ##########
-USERS = {"user": "password123", "user2": "password123"}
+users_env = get_env_var("USERS", "{}")
+try:
+    USERS = json.loads(users_env)
+except json.JSONDecodeError:
+    raise ValueError(f"Invalid USERS environment variable: {users_env}")
 
 class LoginRequest(BaseModel):
     username: str
