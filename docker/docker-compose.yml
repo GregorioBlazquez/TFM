@@ -1,0 +1,51 @@
+services:
+  mcp-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: mcp-server
+    ports:
+      - "8080:8080"
+    environment:
+      - ENVIRONMENT=docker
+    command: python -m mcp_code.servers.main_server
+    env_file:
+      - ../.env.docker
+    volumes:
+      - ../data:/app/data
+      - ../docs:/app/docs
+      - ../models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://mcp-server:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  fastapi-client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fastapi-client
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=docker
+    command: uvicorn api.client.backend_app:backend_app --host 0.0.0.0 --port 8000
+    env_file:
+      - ../.env.docker
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+
+  mcp-inspector:
+    image: ghcr.io/modelcontextprotocol/inspector:latest
+    container_name: mcp-inspector
+    ports:
+      - "5173:5173"
+    environment:
+      - MCP_SERVER=mcp-server:8080
+      - DANGEROUSLY_OMIT_AUTH=true
+    depends_on:
+      mcp-server:
+        condition: service_healthy
