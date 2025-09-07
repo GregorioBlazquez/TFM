@@ -22,11 +22,11 @@ services:
       retries: 5
       start_period: 20s
 
-  fastapi-client:
+  client:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: fastapi-client
+    container_name: client
     ports:
       - "8000:8000"
     environment:
@@ -41,8 +41,7 @@ services:
   mcp-inspector:
     image: ghcr.io/modelcontextprotocol/inspector:latest
     container_name: mcp-inspector
-    ports:
-      - "5173:5173"
+    network_mode: "host"
     environment:
       - MCP_SERVER=mcp-server:8080
       - DANGEROUSLY_OMIT_AUTH=true
