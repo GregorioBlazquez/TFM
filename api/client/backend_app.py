@@ -511,7 +511,7 @@ backend_app = FastAPI(title="Multi-agent API")
 
 # Frontend HTML and static files
 backend_app.mount("/static", StaticFiles(directory="api/client"), name="static")
-log(None, "Static files mounted at http://localhost:8000/static/chat.html or http://localhost:8000/chat", level=logging.INFO)
+log(None, f"Static files mounted at {MCP_BASE}static/chat.html or {MCP_BASE}chat", level=logging.INFO)
 
 @backend_app.get("/chat")
 async def root():
