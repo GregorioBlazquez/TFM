@@ -99,8 +99,10 @@ It returns JSON objects with two fields:
 
 Example outputs:
 
-```json {"intent":"predictor","agents":\["predictor","rag"\]}
-{"intent":"reports","agents":\["rag"\]}```
+```json 
+{"intent":"predictor","agents":["predictor","rag"]}
+{"intent":"reports","agents":["rag"]}
+```
 
 ------------------------------------------------------------------------
 
