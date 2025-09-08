@@ -6,3 +6,8 @@ pypdf==6.0.0
 pandas==2.2.2
 numpy==1.26.4
 sentence_transformers==5.1.0
+langchain==0.3.27
+langchain-core==0.3.74
+shap==0.48.0
+pmdarima==2.0.4
+scikit-learn==1.4.2
