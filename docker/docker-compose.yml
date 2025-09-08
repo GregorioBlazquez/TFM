@@ -1,8 +1,9 @@
 services:
   mcp-server:
+    image: gregorioblazquezm/mcp-server:latest
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.server
     container_name: mcp-server
     ports:
       - "8080:8080"
@@ -23,9 +24,10 @@ services:
       start_period: 20s
 
   client:
+    image: gregorioblazquezm/client:latest
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.client
     container_name: client
     ports:
       - "8000:8000"
