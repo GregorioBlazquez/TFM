@@ -12,10 +12,6 @@ services:
     command: python -m mcp_code.servers.main_server
     env_file:
       - ../.env.docker
-    volumes:
-      - ../data:/app/data
-      - ../docs:/app/docs
-      - ../models:/app/models
     healthcheck:
       test: ["CMD", "curl", "-f", "http://mcp-server:8080/health"]
       interval: 10s

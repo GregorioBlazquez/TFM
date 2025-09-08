@@ -1,0 +1,82 @@
+apiVersion: '2019-12-01'
+location: eastus
+name: demo-tfm-group
+type: Microsoft.ContainerInstance/containerGroups
+properties:
+  osType: Linux
+  containers:
+    - name: mcp-server
+      properties:
+        image: gregorioblazquezm/mcp-server:latest
+        ports:
+          - port: 8080
+        resources:
+          requests:
+            cpu: 1
+            memoryInGb: 1
+        environmentVariables:
+          - name: ENVIRONMENT
+            value: docker
+          - name: MCP_LOGGING_LEVEL
+            value: DEBUG
+          - name: MCP_LOGGING_LEVEL_NOISY
+            value: WARNING
+
+    - name: client
+      properties:
+        image: gregorioblazquezm/client:latest
+        ports:
+          - port: 8000
+        resources:
+          requests:
+            cpu: 1
+            memoryInGb: 1
+        environmentVariables:
+          - name: ENVIRONMENT
+            value: docker
+          - name: MCP_HOST
+            value: mcp-server
+          - name: AZURE_OPENAI_ENDPOINT
+            value: "https://grbla-mdxat1gi-eastus2.cognitiveservices.azure.com/"
+          - name: AZURE_OPENAI_PREDICTOR_DEPLOYMENT
+            value: "o4-mini"
+          - name: AZURE_OPENAI_RAG_DEPLOYMENT
+            value: "gpt-4.1-mini"
+          - name: AZURE_OPENAI_ROUTER_DEPLOYMENT
+            value: "gpt-35-turbo"
+          - name: AZURE_OPENAI_REASONING_DEPLOYMENT
+            value: "gpt-4.1"
+          - name: AZURE_OPENAI_API_VERSION
+            value: "2024-12-01-preview"
+          - name: BACKEND_LOGGIN_LEVEL
+            value: DEBUG
+          - name: BACKEND_LOGGIN_LEVEL_NOISY
+            value: WARNING
+        # Add your secure values manually in Azure
+        # - name: AZURE_OPENAI_API_KEY
+        #   secureValue: <YOUR_API_KEY>
+        # - name: USERS
+        #   secureValue: '{"user":"password1234","user2":"password1234"}'
+
+    - name: mcp-inspector
+      properties:
+        image: ghcr.io/modelcontextprotocol/inspector:latest
+        resources:
+          requests:
+            cpu: 0.5
+            memoryInGb: 0.5
+        environmentVariables:
+          - name: MCP_HOST
+            value: mcp-server
+          - name: MCP_SERVER
+            value: http://mcp-server:8080
+          - name: DANGEROUSLY_OMIT_AUTH
+            value: "true"
+
+  ipAddress:
+    type: Public
+    ports:
+      - protocol: tcp
+        port: 8080
+      - protocol: tcp
+        port: 8000

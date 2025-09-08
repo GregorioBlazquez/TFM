@@ -18,11 +18,16 @@ COPY requirements.base.txt requirements.server.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.base.txt -r requirements.server.txt
 
-# Copy only the needed code
+# Copy the needed code
 COPY mcp_code/servers ./mcp_code/servers/
 COPY api/server ./api/server/
 COPY config.py ./
 COPY .env.docker ./
+
+# Copy needed data, docs, and models
+COPY data ./data/
+COPY docs ./docs/
+COPY models ./models/
 
 # Expose port
 EXPOSE 8080
