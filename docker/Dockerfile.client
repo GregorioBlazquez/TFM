@@ -1,0 +1,30 @@
+# Base image with Python
+FROM python:3.11-slim
+
+# Avoid bytecode and buffering
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Create working directory
+WORKDIR /app
+
+# Install only essential system dependencies first
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install specific requirements
+COPY requirements.base.txt requirements.client.txt ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.base.txt -r requirements.client.txt
+
+# Copy only the needed code
+COPY api/client ./api/client/
+COPY config.py ./
+COPY .env.docker ./
+
+# Expose port
+EXPOSE 8000
+
+# Default command
+CMD ["uvicorn", "api.client.backend_app:backend_app", "--host", "0.0.0.0", "--port", "8000"]
