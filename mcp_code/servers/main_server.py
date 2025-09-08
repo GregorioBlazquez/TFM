@@ -170,10 +170,11 @@ async def health_check(request: Request) -> PlainTextResponse:
 
 if __name__ == "__main__":
     asyncio.run(setup())
-    logger.info(f"🚀 Main MCP server running on http://{MCP_HOST}:{MCP_PORT}/mcp/")
+    host = "0.0.0.0" if os.getenv("ENVIRONMENT") == "azure" else MCP_HOST
+    logger.info(f"🚀 Main MCP server running on http://{host}:{MCP_PORT}/mcp/")
     main_mcp.run(
         transport="http",
-        host=MCP_HOST,
+        host=host,
         port=MCP_PORT,
         log_level=get_env_var("MCP_LOGGING_LEVEL", "DEBUG")
     )

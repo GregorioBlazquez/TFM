@@ -1,0 +1,49 @@
+docker compose -f docker/docker-compose.yml build --no-cache
+
+docker push gregorioblazquezm/mcp-server:latest
+docker push gregorioblazquezm/client:latest
+
+
+az container create   --resource-group TFM   --file azure/mcp-server-aci.yaml 
+
+az container show --resource-group TFM --name mcp-server --query "ipAddress.ip" -o tsv
+68.221.184.227
+
+curl -i http://68.221.184.227:8080/health
+HTTP/1.1 200 OK
+date: Mon, 08 Sep 2025 16:13:00 GMT
+server: uvicorn
+content-length: 2
+content-type: text/plain; charset=utf-8
+
+OK
+
+
+az container create \
+  --resource-group TFM \
+  --file azure/client-aci.yaml \
+  --environment-variables \
+      AZURE_OPENAI_API_KEY="APsY4nVemzx92H2xqH2yZt1kpomsgKqVNm3KpU7kCXsC4IBcEV8oJQQJ99BHACHYHv6XJ3w3AAAAACOGdC3L" \
+      USERS='{"user":"password1234","user2":"password1234"}'
+
+az container show --resource-group TFM --name mcp-client --query "ipAddress.ip" -o tsv
+68.221.231.110
+http://68.221.231.110:8000/static/chat.html
+
+az container create   --resource-group TFM   --file azure/inspector-aci.yaml 
+
+az container show --resource-group TFM --name mcp-inspector --query "ipAddress.ip" -o tsv
+68.221.184.124
+
+
+PRUEBAS:
+docker run -e ENVIRONMENT=azure \
+           -e AZURE_OPENAI_API_KEY="APsY4nVemzx92H2xqH2yZt1kpomsgKqVNm3KpU7kCXsC4IBcEV8oJQQJ99BHACHYHv6XJ3w3AAAAACOGdC3L" \
+           -e USERS='{"user":"password1234"}' \
+           -p 8080:8080 gregorioblazquezm/mcp-server:latest
+
+docker run -e ENVIRONMENT=azure \
+           -e MCP_BASE="http://68.221.184.227:8080/mcp/" \
+           -e AZURE_OPENAI_API_KEY="APsY4nVemzx92H2xqH2yZt1kpomsgKqVNm3KpU7kCXsC4IBcEV8oJQQJ99BHACHYHv6XJ3w3AAAAACOGdC3L" \
+           -e USERS='{"user":"password1234"}' \
+           -p 8000:8000 gregorioblazquezm/client:latest

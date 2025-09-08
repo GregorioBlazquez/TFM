@@ -1,0 +1,38 @@
+apiVersion: '2019-12-01'
+location: spaincentral
+name: mcp-server
+type: Microsoft.ContainerInstance/containerGroups
+properties:
+  osType: Linux
+  containers:
+    - name: mcp-server
+      properties:
+        image: tfmacrdemo.azurecr.io/mcp-server:latest # gregorioblazquezm/mcp-server:latest
+        ports:
+          - port: 8080
+        resources:
+          requests:
+            cpu: 1
+            memoryInGb: 2
+        environmentVariables:
+          - name: ENVIRONMENT
+            value: azure
+          - name: MCP_HOST
+            value: 0.0.0.0
+          - name: MCP_PORT
+            value: 8080
+          - name: MCP_LOGGING_LEVEL
+            value: INFO
+          - name: MCP_LOGGING_LEVEL_NOISY
+            value: WARNING
+
+  imageRegistryCredentials:
+    - server: tfmacrdemo.azurecr.io
+      username: tfmacrdemo
+      password: <PASSWORD>
+
+  ipAddress:
+    type: Public
+    ports:
+      - protocol: tcp
+        port: 8080

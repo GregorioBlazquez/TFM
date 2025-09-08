@@ -1,0 +1,45 @@
+apiVersion: '2019-12-01'
+location: spaincentral
+name: mcp-client
+type: Microsoft.ContainerInstance/containerGroups
+properties:
+  osType: Linux
+  containers:
+    - name: client
+      properties:
+        image: tfmacrdemo.azurecr.io/client:latest # gregorioblazquezm/client:latest
+        ports:
+          - port: 8000
+        resources:
+          requests:
+            cpu: 1
+            memoryInGb: 1
+        environmentVariables:
+          - name: ENVIRONMENT
+            value: azure
+          - name: AZURE_OPENAI_ENDPOINT
+            value: "https://grbla-mdxat1gi-eastus2.cognitiveservices.azure.com/"
+          - name: AZURE_OPENAI_PREDICTOR_DEPLOYMENT
+            value: "o4-mini"
+          - name: AZURE_OPENAI_RAG_DEPLOYMENT
+            value: "gpt-4.1-mini"
+          - name: AZURE_OPENAI_ROUTER_DEPLOYMENT
+            value: "gpt-35-turbo"
+          - name: AZURE_OPENAI_REASONING_DEPLOYMENT
+            value: "gpt-4.1"
+          - name: AZURE_OPENAI_API_VERSION
+            value: "2024-12-01-preview"
+          - name: MCP_BASE
+            value: http://<SERVER_IP>:8080/mcp/  # Replace with actual IP
+        command: ["uvicorn", "api.client.backend_app:backend_app", "--host", "0.0.0.0", "--port", "8000"]
+
+  imageRegistryCredentials:
+    - server: tfmacrdemo.azurecr.io
+      username: tfmacrdemo
+      password: <PASSWORD>
+
+  ipAddress:
+    type: Public
+    ports:
+      - protocol: tcp
+        port: 8000

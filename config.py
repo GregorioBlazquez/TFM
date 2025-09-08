@@ -7,15 +7,15 @@ def load_environment():
     base_path = Path(__file__).parent
 
     # Priority: if ENVIRONMENT is defined, use that
-    env_type = os.getenv("ENVIRONMENT", "local")  # "local" or "docker"
+    env_type = os.getenv("ENVIRONMENT", "local")  # "local" or "docker" or "azure"
 
-    if env_type == "docker":
+    if env_type in ("docker", "azure"):
         env_path = base_path / ".env.docker"
     else:
         env_path = base_path / ".env.local"
 
     if env_path.exists():
-        load_dotenv(env_path, override=True)
+        load_dotenv(env_path, override=False)
         print(f"✓ Loaded .env from: {env_path}")
     else:
         print(f"⚠️  No .env file found for {env_type} environment at {env_path}")

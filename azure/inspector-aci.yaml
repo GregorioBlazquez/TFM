@@ -1,0 +1,23 @@
+apiVersion: '2019-12-01'
+location: eastus
+name: mcp-inspector
+type: Microsoft.ContainerInstance/containerGroups
+properties:
+  osType: Linux
+  containers:
+    - name: mcp-inspector
+      properties:
+        image: ghcr.io/modelcontextprotocol/inspector:latest
+        resources:
+          requests:
+            cpu: 0.5
+            memoryInGb: 0.5
+        environmentVariables:
+          - name: MCP_SERVER
+            value: http://<SERVER_IP>:8080  # Replace with actual IP
+          - name: DANGEROUSLY_OMIT_AUTH
+            value: "true"
+
+  ipAddress:
+    type: Public
+    ports: []
