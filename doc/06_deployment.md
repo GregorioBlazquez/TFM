@@ -152,5 +152,5 @@ docker run -e ENVIRONMENT=azure\
 
 ## 🧭 Navigation
 
-- [⬅️ Previous: Client](/04_client.md)
+- [⬅️ Previous: Data Model](/05_data_model.md)
 - [🏠 Main index](../README.md#documentation)
