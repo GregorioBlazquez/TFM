@@ -18,16 +18,16 @@ This document describes how to set up and run the system in different environmen
 
 ### Setup
 Create and activate a Python virtual environment:
-[[[
+```
 python3.11 -m venv TFM_venv
 source TFM_venv/bin/activate
-]]]
+```
 
 Install dependencies:
-[[[
+```
 pip install --upgrade pip
 pip install -r requirements.txt
-]]]
+```
 
 This environment can be used for:
 - Running the MCP server
@@ -37,14 +37,14 @@ This environment can be used for:
 ### Commands
 
 Start the MCP server:
-[[[
+```
 python -m mcp_code.servers.main_server
-]]]
+```
 
 Start the backend client:
-[[[
+```
 uvicorn api.client.backend_app:backend_app --host 0.0.0.0 --port 8000
-]]]
+```
 
 ---
 
@@ -53,15 +53,15 @@ uvicorn api.client.backend_app:backend_app --host 0.0.0.0 --port 8000
 A preconfigured `docker-compose.yml` is provided in the `docker/` folder.
 
 ### Launch services
-[[[
+```
 docker compose -f docker/docker-compose.yml up
-]]]
+```
 
 ### Build images locally (optional)
 By default, DockerHub images are used. To force local builds:
-[[[
+```
 docker compose -f docker/docker-compose.yml build --no-cache
-]]]
+```
 
 ---
 
@@ -71,14 +71,14 @@ The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) can be ru
 It automatically connects to `localhost:8080` and allows visual inspection of servers, tools, and prompts.
 
 ### Launch Inspector
-[[[
+```
 npx @modelcontextprotocol/inspector
-]]]
+```
 
 Check npm version:
-[[[
+```
 npx --version
-]]]
+```
 
 ---
 
@@ -98,9 +98,9 @@ Simply start Jupyter Lab or Notebook after activating the environment.
 
 - **Port conflicts (8080 or 8000 in use)**  
   Kill the process or change the port in the launch command. Example:  
-  [[[
+  ```
   uvicorn api.client.backend_app:backend_app --host 0.0.0.0 --port 8010
-  ]]]
+  ```
 
 - **Inspector does not connect**  
   Ensure the MCP server is running on `localhost:8080`.  
@@ -108,9 +108,9 @@ Simply start Jupyter Lab or Notebook after activating the environment.
 
 - **Docker build issues**  
   Run with `--no-cache` to rebuild images from scratch:  
-  [[[
+  ```
   docker compose -f docker/docker-compose.yml build --no-cache
-  ]]]
+  ```
 
 - **Missing dependencies in notebooks**  
   Always install from `requirements.txt`, not just `requirements.dev.txt` or `requirements.base.txt`.
