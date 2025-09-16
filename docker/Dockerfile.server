@@ -24,9 +24,9 @@ COPY api/server ./api/server/
 COPY config.py ./
 COPY .env.docker ./
 
-# Copy needed data, docs, and models
+# Copy needed data, documents, and models
 COPY data ./data/
-COPY docs ./docs/
+COPY documents ./documents/
 COPY models ./models/
 
 # Expose port

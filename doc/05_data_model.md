@@ -22,11 +22,11 @@ The pipeline covers:
 Located in `data/raw/`:
 - **FRONTUR/** → Survey on inbound tourist flows (visitors, trip characteristics).
 - **EGATUR/** → Survey on tourist expenditure (spending patterns, trip details).
-- **Accompanying PDFs** (e.g., `FRONTUR0625.pdf`, `EGATUR0625.pdf`) with methodological notes, avaiable in `docs`.
+- **Accompanying PDFs** (e.g., `FRONTUR0625.pdf`, `EGATUR0625.pdf`) with methodological notes, avaiable in `documents`.
 
 ### Processed Data
 Located in `data/processed/`:
-- **`num_tourists.csv`** → Aggregated monthly number of tourists by Autonomous Community (used for ARIMA).
+- **`frontur_data_ready.csv`** → Aggregated monthly number of tourists by Autonomous Community (used for ARIMA).
 - **`egatur_data_ready.csv`** → Cleaned dataset with selected EGATUR features for clustering and expenditure modeling.
 - **`egatur_full_dataset.csv`** → Full processed EGATUR dataset with additional variables.
 
@@ -113,7 +113,7 @@ Models are consumed in `api/server/model_handler.py`:
 
 Endpoints in `api/server/main.py`:
 - `/predict` → Tourist forecasting (ARIMA).
-- `/historical` → Historical tourist numbers (from `data/processed/num_tourists.csv`).
+- `/historical` → Historical tourist numbers (from `data/processed/frontur_data_ready.csv`).
 - `/cluster` → Tourist profile clustering.
 - `/expenditure` → Daily average expenditure with SHAP explanations.
 

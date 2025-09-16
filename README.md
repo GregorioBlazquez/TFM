@@ -26,7 +26,7 @@ The goal is to combine **predictive modeling**, **retrieval-augmented generation
 ├── data/               # Processed and raw datasets, FAISS index for RAG
 ├── doc/                # Main technical documentation (overview, setup, server, client, data, deployment)
 ├── docker/             # Dockerfiles and docker-compose setup
-├── docs/               # Additional resources, INE reports (FRONTUR, EGATUR), FAQs
+├── documents/          # Additional resources, INE reports (FRONTUR, EGATUR), FAQs
 ├── gpt.txt             # Prompt/experiment notes
 ├── mcp_code/           # MCP servers (main, rag, report) and client code (multiagents)
 ├── models/             # Trained models (ARIMA, clustering, expenditure regression)
@@ -76,4 +76,4 @@ For environment-specific setup and docker details, see `doc/02_setup.md` and `do
 - [04 – Client](doc/04_client.md)  
 - [05 – Data & Models](doc/05_data_model.md)  
 - [06 – Deployment](doc/06_deployment.md)  
-- Additional resources and INE files: see `docs/` (FRONTUR, EGATUR, EDA notes).
+- Additional resources and INE files: see `documents/` (FRONTUR, EGATUR, EDA notes).

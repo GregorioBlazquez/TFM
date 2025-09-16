@@ -7,7 +7,7 @@ import pandas as pd
 from typing import Optional, Dict, List, Tuple
 import numpy as np
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "../../data/processed/num_tourists.csv")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "../../data/processed/frontur_data_ready.csv")
 
 ARIMA_MODELS_DIR = os.path.join(os.path.dirname(__file__), "../../models/arima")
 CLUSTER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/cluster/cluster_classifier_eda_lr.joblib")

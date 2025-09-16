@@ -35,5 +35,5 @@ tmp/
 temp/
 
 # RAG index
-data/docs_meta.json
-data/vector_index.faiss
+documents/docs_meta.json
+documents/vector_index.faiss

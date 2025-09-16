@@ -33,7 +33,7 @@ docker compose -f docker/docker-compose.yml up
 ### MCP Server (`Dockerfile.server`)
 
 - Installs Python dependencies from `requirements.base.txt` and `requirements.server.txt`.  
-- Copies **servers code**, **API server**, **config**, **.env**, plus **data/docs/models**.  
+- Copies **servers code**, **API server**, **config**, **.env**, plus **data/documents/models**.  
 - Exposes port **8080**.  
 - Default command:  
   ```bash

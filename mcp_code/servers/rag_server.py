@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 # --- Paths ---
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DATA_DIR.mkdir(exist_ok=True)
-INDEX_PATH = DATA_DIR / "vector_index.faiss"
-DOCS_PATH = DATA_DIR / "docs_meta.json"
-DOCS_DIR = Path(__file__).resolve().parents[2] / "docs"
+DOCS_DIR = Path(__file__).resolve().parents[2] / "documents"
+INDEX_PATH = DOCS_DIR / "vector_index.faiss"
+DOCS_PATH = DOCS_DIR / "docs_meta.json"
 
 # --- Embeddings + Index ---
 MODEL_NAME = get_env_var("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
@@ -137,35 +137,35 @@ def _scan_docs() -> List[Dict]:
     # --- FAQs ---
     faqs = DOCS_DIR / "project_faqs.md"
     if faqs.exists():
-        add_doc(faqs, "docs://faqs", "Project FAQs", "faq")
+        add_doc(faqs, "documents://faqs", "Project FAQs", "faq")
 
     # --- EGATUR ---
     egatur_dir = DOCS_DIR / "egatur"
     if egatur_dir.exists():
         for f in egatur_dir.iterdir():
             if f.suffix.lower() == ".md":
-                add_doc(f, f"docs://egatur/{f.stem}", f"EGATUR {f.stem}", "markdown")
+                add_doc(f, f"documents://egatur/{f.stem}", f"EGATUR {f.stem}", "markdown")
             elif f.suffix.lower() == ".pdf":
                 meta = parse_pdf_metadata(f.name)
                 title = f"EGATUR {meta['year']}-{meta['month']:02d}" if meta["year"] else f.name
-                add_doc(f, f"docs://egatur/{f.stem}", title, "pdf", meta["year"], meta["month"])
+                add_doc(f, f"documents://egatur/{f.stem}", title, "pdf", meta["year"], meta["month"])
 
     # --- FRONTUR ---
     frontur_dir = DOCS_DIR / "frontur"
     if frontur_dir.exists():
         for f in frontur_dir.iterdir():
             if f.suffix.lower() == ".md":
-                add_doc(f, f"docs://frontur/{f.stem}", f"FRONTUR {f.stem}", "markdown")
+                add_doc(f, f"documents://frontur/{f.stem}", f"FRONTUR {f.stem}", "markdown")
             elif f.suffix.lower() == ".pdf":
                 meta = parse_pdf_metadata(f.name)
                 title = f"FRONTUR {meta['year']}-{meta['month']:02d}" if meta["year"] else f.name
-                add_doc(f, f"docs://frontur/{f.stem}", title, "pdf", meta["year"], meta["month"])
+                add_doc(f, f"documents://frontur/{f.stem}", title, "pdf", meta["year"], meta["month"])
 
     # --- Destinations ---
     dests = DOCS_DIR / "destinations"
     if dests.exists():
         for f in dests.glob("*.md"):
-            add_doc(f, f"docs://destinations/{f.stem}", f"Destination {f.stem.title()}", "destination")
+            add_doc(f, f"documents://destinations/{f.stem}", f"Destination {f.stem.title()}", "destination")
 
     return docs
 
@@ -321,7 +321,7 @@ def agent_prompt():
 from pathlib import Path
 import pandas as pd
 
-DATA_PATH = Path(__file__).resolve().parents[2] / "data/processed/num_tourists.csv"
+DATA_PATH = Path(__file__).resolve().parents[2] / "data/processed/frontur_data_ready.csv"
 TOURIST_DATA = pd.read_csv(DATA_PATH, sep=";", parse_dates=["Period"])
 TOURIST_DATA.rename(columns={"CCAA": "region", "Total": "tourists"}, inplace=True)
 
