@@ -1,3 +1,7 @@
+# EGATUR
+**Source:** Spanish Statistical Office (INE) [Tourist Expenditure Survey (EGATUR)](https://www.ine.es/dyngs/INEbase/en/operacion.htm?c=Estadistica_C&cid=1254736177002&menu=ultiDatos&idp=1254735576863)
+**Coverage:** January 2020 – June 2025 (monthly updates)  
+
 ### 🔹 Variables in `elevado_eg_mod_web_tur_*.txt` (trips)
 
 | Variable       | Type     | Values / Example   | Description |
