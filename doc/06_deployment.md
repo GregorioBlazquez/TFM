@@ -37,8 +37,8 @@ docker compose -f docker/docker-compose.yml up
 - Exposes port **8080**.  
 - Default command:  
   ```bash
-  python -m mcp_code.servers.main_server
-  ```
+python -m mcp_code.servers.main_server
+```
 
 ### Client (`Dockerfile.client`)
 
@@ -47,8 +47,8 @@ docker compose -f docker/docker-compose.yml up
 - Exposes port **8000**.  
 - Default command:  
   ```bash
-  uvicorn api.client.backend_app:backend_app --host 0.0.0.0 --port 8000
-  ```
+uvicorn api.client.backend_app:backend_app --host 0.0.0.0 --port 8000
+```
 
 ### docker-compose.yml
 
@@ -73,13 +73,65 @@ Images are published both on **DockerHub** and **Azure Container Registry (ACR)*
 
 ------------------------------------------------------------------------
 
+## 🔹 Azure Container Registry (ACR)
+
+If you want to deploy from **Azure Container Registry** instead of DockerHub, you first need to create and push the images.
+
+### 1. Create ACR
+
+```bash
+az acr create \
+  --resource-group TFM \
+  --name tfmacrdemo \
+  --sku Basic
+```
+
+This will create a private registry at:  
+`tfmacrdemo.azurecr.io`
+
+### 2. Login to ACR
+
+```bash
+az acr login --name tfmacrdemo
+```
+
+### 3. Tag local images for ACR
+
+```bash
+docker tag gregorioblazquezm/mcp-server:latest tfmacrdemo.azurecr.io/mcp-server:latest
+docker tag gregorioblazquezm/client:latest tfmacrdemo.azurecr.io/client:latest
+```
+
+### 4. Push images to ACR
+
+```bash
+docker push tfmacrdemo.azurecr.io/mcp-server:latest
+docker push tfmacrdemo.azurecr.io/client:latest
+```
+
+### 5. Update deployment manifests
+
+In your ACI YAML files (`azure/mcp-server-aci.yaml`, `azure/client-aci.yaml`), set the `image:` field to:
+
+```yaml
+image: tfmacrdemo.azurecr.io/mcp-server:latest
+```
+
+and
+
+```yaml
+image: tfmacrdemo.azurecr.io/client:latest
+```
+
+------------------------------------------------------------------------
+
 ## 🔹 Azure Deployment (ACI)
 
 Both **MCP server** and **client** are deployed as separate **container
 groups** within resource group `TFM`.  
 Images can be pulled from DockerHub or ACR.
 
-### Push Images
+### Push Images (DockerHub)
 
 ```bash
 docker push gregorioblazquezm/mcp-server:latest
@@ -103,7 +155,7 @@ curl -i http://<SERVER_IP>:8080/health
 ### Deploy Client
 
 ```bash
-az container create   --resource-group TFM   --file azure/client-aci.yaml   --environment-variables       AZURE_OPENAI_API_KEY="***"       USERS='{"user":"password1234","user2":"password1234"}'
+az container create   --resource-group TFM   --file azure/client-aci.yaml   --environment-variables       AZURE_OPENAI_API_KEY="***"       USERS='{"user":"**password**","user2":"**password**"}'
 
 az container show --resource-group TFM --name mcp-client --query "ipAddress.ip" -o tsv
 ```
@@ -128,13 +180,13 @@ Run containers manually for testing.
 ### MCP Server
 
 ```bash
-docker run -e ENVIRONMENT=azure            -e AZURE_OPENAI_API_KEY="***"            -e USERS='{"user":"password1234"}'            -p 8080:8080 gregorioblazquezm/mcp-server:latest
+docker run -e ENVIRONMENT=azure            -e AZURE_OPENAI_API_KEY="***"            -e USERS='{"user":"**password**"}'            -p 8080:8080 tfmacrdemo.azurecr.io/mcp-server:latest
 ```
 
 ### Client
 
 ```bash
-docker run -e ENVIRONMENT=azure            -e MCP_BASE="http://<SERVER_IP>:8080/mcp/"            -e AZURE_OPENAI_API_KEY="***"            -e USERS='{"user":"password1234"}'            -p 8000:8000 gregorioblazquezm/client:latest
+docker run -e ENVIRONMENT=azure            -e MCP_BASE="http://<SERVER_IP>:8080/mcp/"            -e AZURE_OPENAI_API_KEY="***"            -e USERS='{"user":"**password**"}'            -p 8000:8000 tfmacrdemo.azurecr.io/client:latest
 ```
 
 ------------------------------------------------------------------------
