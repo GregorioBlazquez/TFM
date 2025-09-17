@@ -4,6 +4,7 @@ import json
 import logging
 from typing import TypedDict, List, Optional, Dict, Any
 import uuid
+from httpx import ConnectError
 
 from fastapi import Depends
 from fastapi import FastAPI, HTTPException, Header
@@ -536,8 +537,21 @@ async def startup_event():
     log(None, "Starting app: initializing MCP client and agents...", level=logging.INFO)
     client = MultiServerMCPClient({"main": {"url": MCP_BASE, "transport": "streamable_http"}})
     session_ctx = client.session("main")
-    session = await session_ctx.__aenter__()
 
+    # Retry loop para la conexión
+    max_retries = 10
+    delay = 5  # segundos
+    session = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            session = await session_ctx.__aenter__()
+            break
+        except ConnectError as e:
+            log(None, f"⚠️ MCP server not ready (attempt {attempt}/{max_retries}): {e}", level=logging.WARNING)
+            await asyncio.sleep(delay)
+    if session is None:
+        raise RuntimeError("❌ Could not connect to MCP server after retries")
+    
     backend_app.state.mcp_client = client
     backend_app.state.mcp_session_ctx = session_ctx
     backend_app.state.mcp_session = session
