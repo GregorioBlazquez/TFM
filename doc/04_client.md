@@ -49,7 +49,7 @@ The backend builds a **state machine** with the following nodes: -
 - **predictor/rag** → direct responses when needed.\
 - **done/other** → terminal states.
 
-👉 This orchestration ensures that queries like *"Forecast tourists in
+> This orchestration ensures that queries like *"Forecast tourists in
 Spain 2025"* trigger **predictor + rag**, while *"Explain the EGATUR
 dataset"* routes to **rag** only, and *"Generate a tourism report"*
 routes through **all agents**.
@@ -71,7 +71,7 @@ the backend API.
 -   **Markdown rendering** with `marked.js`.\
 -   **New chat** button resets the conversation.
 
-👉 The frontend is deliberately simple, focusing on functionality rather
+> The frontend is deliberately simple, focusing on functionality rather
 than design. It communicates with the backend via `/login`, `/ask`, and
 `/new_chat` endpoints.
 
@@ -88,7 +88,7 @@ than design. It communicates with the backend via `/login`, `/ask`, and
 
 ------------------------------------------------------------------------
 
-## 🧭 Navigation
+## Navigation
 
 - [⬅️ Previous: MCP Server](/03_mcp_server.md)
 - [🏠 Main index](../README.md#documentation)

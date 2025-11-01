@@ -6,7 +6,7 @@ The goal is to combine **predictive modeling**, **retrieval-augmented generation
 
 ---
 
-## 🏗️ Project Architecture (high level)
+## Project Architecture (high level)
 
 - **MCP Server** → Exposes tools, prompts, and resources (sub-servers: prediction API, RAG, reports).  
 - **Client (multi-agent orchestrator)** → Connects to MCP server, coordinates agents, maintains session state and delivers final answers.  
@@ -16,7 +16,7 @@ The goal is to combine **predictive modeling**, **retrieval-augmented generation
 
 ---
 
-## 📂 Repository Structure (short)
+## Repository Structure (short)
 
 ```text
 .
@@ -39,7 +39,7 @@ The goal is to combine **predictive modeling**, **retrieval-augmented generation
 
 ---
 
-## 🚀 Quick Start (developer)
+## Quick Start (developer)
 
 1. Create a Python 3.11 virtual environment and install dependencies:
 ```bash
@@ -68,7 +68,7 @@ For environment-specific setup and docker details, see `doc/02_setup.md` and `do
 
 ---
 
-## 📚 Documentation Index (detailed docs)
+## Documentation Index (detailed docs)
 
 - [01 – Overview](doc/01_overview.md)  
 - [02 – Setup Guide](doc/02_setup.md)  

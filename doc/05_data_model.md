@@ -119,7 +119,7 @@ Endpoints in `api/server/main.py`:
 
 ---
 
-## 🧭 Navigation
+## Navigation
 
 - [⬅️ Previous: Client](/04_client.md)
 - [🏠 Main index](../README.md#documentation)

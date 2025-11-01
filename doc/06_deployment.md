@@ -215,7 +215,7 @@ docker run -e ENVIRONMENT=azure            -e MCP_BASE="http://<SERVER_IP>:8080/
 
 ------------------------------------------------------------------------
 
-## 🧭 Navigation
+## Navigation
 
 - [⬅️ Previous: Data Model](/05_data_model.md)
 - [🏠 Main index](../README.md#documentation)

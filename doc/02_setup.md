@@ -126,7 +126,7 @@ Simply start Jupyter Lab or Notebook after activating the environment.
 
 ------------------------------------------------------------------------
 
-## 🧭 Navigation
+## Navigation
 
 - [⬅️ Previous: Overview](/01_overview.md)
 - [🏠 Main index](../README.md#documentation)

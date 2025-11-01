@@ -4,7 +4,7 @@ The **MCP Server** is the central backend of the project. It is built on
 top of **FastMCP** and organizes different sub-servers that expose the
 available functionality: prediction, document retrieval, and reporting.
 
-⚠️ **Important**: The actual *orchestrator* of the system is the
+**Important**: The actual *orchestrator* of the system is the
 **client** (multi-agent chatbot). The MCP server does not decide
 autonomously; instead, it exposes **tools, prompts, and resources** that
 the client can use to execute workflows.
@@ -45,8 +45,8 @@ It provides 4 main endpoints:
 -   **/expenditure** → Predict daily average expenditure with SHAP-based
     interpretability.
 
-👉 Input/Output is defined with Pydantic schemas.\
-👉 Models are loaded from `/models` and datasets from `/data/processed`.
+> Input/Output is defined with Pydantic schemas.\
+> Models are loaded from `/models` and datasets from `/data/processed`.
 
 ------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ documents.
     -   `clusters://profiles` → qualitative cluster descriptions.\
     -   `eda://summary` → findings from the EDA.
 
-👉 This agent **does not summarize or interpret**. It only returns raw
+> This agent **does not summarize or interpret**. It only returns raw
 text/documents.
 
 ------------------------------------------------------------------------
@@ -83,7 +83,7 @@ This agent interprets outputs from predictor and RAG sub-servers:
 -   Compare against benchmarks and trends.\
 -   Provide business/tourism insights.
 
-👉 **Limitations**: It does not generate predictions nor retrieve new
+> **Limitations**: It does not generate predictions nor retrieve new
 documents.
 
 ------------------------------------------------------------------------
@@ -127,7 +127,7 @@ Example outputs:
 
 ------------------------------------------------------------------------
 
-## 🧭 Navigation
+## Navigation
 
 - [⬅️ Previous: Setup](/02_setup.md)
 - [🏠 Main index](../README.md#documentation)
